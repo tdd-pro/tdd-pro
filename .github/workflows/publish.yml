@@ -38,7 +38,7 @@ jobs:
           cache: 'npm'
           cache-dependency-path: packages/tdd-pro/package-lock.json
 
-      - name: Set up Bun (for publishing scripts)
+      - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest

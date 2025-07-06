@@ -39,6 +39,11 @@ jobs:
           cache: 'npm'
           cache-dependency-path: packages/tdd-pro/package-lock.json
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
       - name: Download Go modules
         run: cd packages/tui && go mod download
 
