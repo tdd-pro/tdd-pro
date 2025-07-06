@@ -19,7 +19,8 @@ builds:
       - arm64
     ldflags:
       - -s -w -X main.version={{.Version}}
-    main: ./packages/tui/main.go
+    main: ./main.go
+    dir: ./packages/tui
     binary: tdd-pro
 
 archives:
