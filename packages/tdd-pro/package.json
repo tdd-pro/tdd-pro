@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "test": "bun test",
+    "test": "vitest run",
     "dev": "mastra dev",
     "dev:mcp": "mastra dev --port 4111",
     "build": "mastra build",
@@ -11,7 +11,7 @@
     "mcp": "bun mcp-stdio-server.ts",
     "server": "bun src/mastra/server.ts",
     "server:watch": "bunx tsx watch src/mastra/server.ts",
-    "coverage": "bun test --coverage"
+    "coverage": "vitest run --coverage"
   },
   "keywords": [],
   "author": "",
