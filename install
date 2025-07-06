@@ -703,37 +703,29 @@ main() {
     log_info ""
     
     # Task 3: Download correct binary
-    log_info "Task 3: Downloading binary..."
-    log_info "Expected filename: ${BINARY_NAME}-${RELEASE_TAG}-${DETECTED_OS}-${DETECTED_ARCH}.tar.gz"
-    log_info "Expected URL: ${DOWNLOAD_BASE}/${BINARY_NAME}-${RELEASE_TAG}-${DETECTED_OS}-${DETECTED_ARCH}.tar.gz"
-    
-    # Note: This will fail until actual releases are published
-    # For demonstration, we'll show what would happen
-    log_warn "⚠️  Skipping actual download (no releases published yet)"
-    log_info "✅ Task 3 completed: Download logic implemented"
-    log_info "   (Will work once releases are published)"
+    download_binary
+    log_info "✅ Task 3 completed: Binary downloaded successfully"
     log_info ""
     
-    # The following tasks would run in a real installation:
-    log_info "Remaining tasks (will run once releases are available):"
-    log_info "✅ Task 4: SHA256 checksum verification logic implemented"
-    log_info "✅ Task 5: Binary installation logic implemented"
-    log_info "✅ Task 6: Installation verification logic implemented"
-    log_info "✅ Task 8: User experience enhancements implemented"
+    # Task 4: Verify SHA256 checksum
+    verify_checksum
+    log_info "✅ Task 4 completed: Checksum verification passed"
     log_info ""
     
-    log_info "🎉 TDD-Pro installation script is complete and ready!"
-    log_info ""
-    log_info "✅ Task 8 completed: User experience enhancements implemented"
-    log_info "   - Interactive banner and progress indicators"
-    log_info "   - Comprehensive help and usage information"
-    log_info "   - Custom installation directory support"
-    log_info "   - Version selection support"
-    log_info "   - Verbose and force mode options"
-    log_info "   - Post-installation instructions and next steps"
+    # Task 5: Install binary
+    install_binary
+    log_info "✅ Task 5 completed: Binary installed successfully"
     log_info ""
     
-    # Show post-install instructions (would be called after successful installation)
+    # Task 6: Verify installation
+    verify_installation
+    log_info "✅ Task 6 completed: Installation verified"
+    log_info ""
+    
+    log_info "🎉 TDD-Pro installation completed successfully!"
+    log_info ""
+    
+    # Show post-install instructions
     show_post_install_instructions
 }
 

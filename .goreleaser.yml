@@ -1,0 +1,119 @@
+version: 2
+
+project_name: tdd-pro
+
+before:
+  hooks:
+    # Build Node.js components first
+    - cd packages/tdd-pro && npm ci && npm run build
+
+builds:
+  - id: tui
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    main: ./packages/tui/main.go
+    binary: tdd-pro
+
+archives:
+  - id: default
+    format: tar.gz
+    name_template: >-
+      tdd-pro-
+      {{- .Version }}-
+      {{- if eq .Os "darwin" }}darwin
+      {{- else if eq .Os "windows" }}windows
+      {{- else }}{{ .Os }}{{ end }}-
+      {{- if eq .Arch "amd64" }}amd64
+      {{- else if eq .Arch "386" }}i386
+      {{- else }}{{ .Arch }}{{ end }}
+      {{- if .Arm }}v{{ .Arm }}{{ end }}
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      # Include additional files in the archive
+      - README.md
+      - LICENSE
+      - packages/tdd-pro/dist/**/*
+
+checksum:
+  name_template: "checksums.txt"
+
+snapshot:
+  name_template: "0.0.0-{{ .Timestamp }}"
+
+# Homebrew tap configuration
+brews:
+  - repository:
+      owner: tdd-pro
+      name: homebrew-tap
+    homepage: "https://github.com/tdd-pro/tdd-pro"
+    description: "AI-Powered Test-Driven Development Agent"
+    license: "MIT"
+    install: |
+      bin.install "tdd-pro"
+    test: |
+      system "#{bin}/tdd-pro", "--version"
+
+# AUR packages for Arch Linux
+aurs:
+  - name: tdd-pro-bin
+    homepage: "https://github.com/tdd-pro/tdd-pro"
+    description: "AI-Powered Test-Driven Development Agent"
+    maintainers:
+      - "TDD-Pro Team"
+    license: "MIT"
+    private_key: "{{ .Env.AUR_KEY }}"
+    git_url: "ssh://aur@aur.archlinux.org/tdd-pro-bin.git"
+    provides:
+      - tdd-pro
+    conflicts:
+      - tdd-pro
+    package: |-
+      install -Dm755 ./tdd-pro "${pkgdir}/usr/bin/tdd-pro"
+
+# Debian/RPM packages
+nfpms:
+  - id: packages
+    package_name: tdd-pro
+    maintainer: TDD-Pro Team <team@tdd-pro.dev>
+    description: "AI-Powered Test-Driven Development Agent"
+    homepage: "https://github.com/tdd-pro/tdd-pro"
+    license: "MIT"
+    formats:
+      - deb
+      - rpm
+    file_name_template: >-
+      {{ .ProjectName }}-
+      {{- .Version }}-
+      {{- if eq .Os "darwin" }}darwin
+      {{- else }}{{ .Os }}{{ end }}-
+      {{- .Arch }}
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^doc:"
+      - "^test:"
+      - "^tests:"
+      - "^ci:"
+      - "^chore:"
+      - "^style:"
+      - "^refactor:"
+      - "^ignore:"
+      - "^example:"
+      - "^wip:"
+      - "merge conflict"
+      - Merge pull request
+      - Merge remote-tracking branch
+      - Merge branch

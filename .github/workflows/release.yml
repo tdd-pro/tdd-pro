@@ -1,0 +1,25 @@
+# This file is deprecated - use publish.yml instead
+# Keeping for reference only
+
+name: release-deprecated
+
+on:
+  workflow_dispatch:
+    inputs:
+      note:
+        description: 'This workflow is deprecated. Use publish.yml instead.'
+        required: false
+
+jobs:
+  deprecated:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deprecation Notice
+        run: |
+          echo "❌ This workflow is deprecated"
+          echo "✅ Use the 'publish' workflow instead"
+          echo "📋 To create a release:"
+          echo "   1. Create a git tag: git tag v1.0.0"
+          echo "   2. Push the tag: git push origin v1.0.0"
+          echo "   3. The 'publish' workflow will automatically run"
+          exit 1
