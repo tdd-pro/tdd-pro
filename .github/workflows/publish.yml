@@ -43,21 +43,6 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Install makepkg for AUR
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y pacman-package-manager
-
-      - name: Setup SSH for AUR
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.AUR_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H aur.archlinux.org >> ~/.ssh/known_hosts
-          git config --global user.email "team@tdd-pro.dev"
-          git config --global user.name "TDD-Pro Release Bot"
-
       - name: Download Go modules
         run: cd packages/tui && go mod download
 
@@ -91,7 +76,6 @@ jobs:
           args: ${{ github.event_name == 'workflow_dispatch' && 'build --snapshot --clean' || 'release --clean' }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          AUR_KEY: ${{ secrets.AUR_KEY }}
 
       - name: Update install script compatibility
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
@@ -99,3 +83,36 @@ jobs:
           # The install script should now work with the new release
           echo "✅ Install script is now compatible with release ${{ github.ref_name }}"
           echo "Users can run: curl -fsSL https://raw.githubusercontent.com/tdd-pro/tdd-pro/main/install | bash"
+
+      - name: Set package.json version from tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#v}
+          npm version --no-git-tag-version $VERSION
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public
+
+  build-and-publish:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: packages/mcp-server
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build binary
+        run: bun run build
+
+      - name: Publish to npm
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: npm publish --access public

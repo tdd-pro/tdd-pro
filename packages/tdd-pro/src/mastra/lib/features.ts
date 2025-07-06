@@ -2,34 +2,51 @@ import fs from "fs/promises";
 import path from "path";
 import yaml from "js-yaml";
 
-async function findTddProRoot(startDir: string, fsMod = fs): Promise<{ success: true; root: string } | { success: false; error: string }> {
+export async function findTddProRoot(startDir: string, fsMod = fs): Promise<{ success: true; root: string } | { success: false; error: string }> {
   let currentDir = path.resolve(startDir);
   const rootDir = path.parse(currentDir).root;
+  const homeDir = process.env.HOME || process.env.USERPROFILE; // cross-platform
+  let foundHomeTddPro: string | null = null;
   
   while (currentDir !== rootDir) {
     try {
       const tddProPath = path.join(currentDir, '.tdd-pro');
       await fsMod.stat(tddProPath);
-      // Found .tdd-pro directory
-      return { success: true, root: currentDir };
+      // If this is $HOME/.tdd-pro, remember it but keep searching up
+      if (homeDir && path.resolve(currentDir) === path.resolve(homeDir)) {
+        foundHomeTddPro = currentDir;
+      } else {
+        // Found a project-local .tdd-pro directory
+        return { success: true, root: currentDir };
+      }
     } catch (e) {
       // .tdd-pro doesn't exist, go up one level
-      currentDir = path.dirname(currentDir);
     }
+    currentDir = path.dirname(currentDir);
   }
   
   // Check root directory too
   try {
     const tddProPath = path.join(currentDir, '.tdd-pro');
     await fsMod.stat(tddProPath);
-    return { success: true, root: currentDir };
+    if (homeDir && path.resolve(currentDir) === path.resolve(homeDir)) {
+      foundHomeTddPro = currentDir;
+    } else {
+      return { success: true, root: currentDir };
+    }
   } catch (e) {
     // Not found anywhere
-    return { 
-      success: false, 
-      error: "No .tdd-pro directory found. Please run 'tdd-pro init' in your project root to initialize TDD-Pro tracking." 
-    };
   }
+  
+  // If we found $HOME/.tdd-pro but nothing else, return it as a fallback
+  if (foundHomeTddPro) {
+    return { success: true, root: foundHomeTddPro };
+  }
+  
+  return {
+    success: false,
+    error: "No .tdd-pro directory found. Please run 'tdd-pro init' in your project root to initialize TDD-Pro tracking."
+  };
 }
 
 interface FeatureItem {
@@ -133,7 +150,7 @@ ${description}
   
   // Create default tasks.yml
   const tasksPath = path.join(featureDir, "tasks.yml");
-  const defaultTasks = [];
+  const defaultTasks: any[] = [];
   
   try {
     await fsMod.stat(tasksPath);

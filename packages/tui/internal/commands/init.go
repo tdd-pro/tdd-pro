@@ -5,8 +5,10 @@ import (
 	"os"
 	"path/filepath"
 
-	tea "github.com/charmbracelet/bubbletea"
 	"tddpro/internal/components/config"
+	"tddpro/internal/util"
+
+	tea "github.com/charmbracelet/bubbletea"
 )
 
 // InitCommand handles the /init command
@@ -35,9 +37,9 @@ func (cmd *InitCommand) Execute(arg string) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	
+
 	// Check if any parent directory already has .tdd-pro
-	if isAlreadyInitialized(cwd) {
+	if util.IsAlreadyInitialized(cwd) {
 		return nil, func() tea.Msg {
 			return CommandResultMsg{
 				Success: false,
@@ -45,7 +47,7 @@ func (cmd *InitCommand) Execute(arg string) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	
+
 	// Create .tdd-pro directory structure
 	if err := cmd.createTddProStructure(cwd); err != nil {
 		return nil, func() tea.Msg {
@@ -55,11 +57,11 @@ func (cmd *InitCommand) Execute(arg string) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	
+
 	// Show MCP configuration dialog
 	cmd.mcpDialog = config.NewMCPConfigDialog(cwd)
 	cmd.mcpDialog.Show()
-	
+
 	return cmd.mcpDialog, cmd.mcpDialog.Init()
 }
 
@@ -68,12 +70,12 @@ func (cmd *InitCommand) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if cmd.mcpDialog == nil {
 		return nil, nil
 	}
-	
+
 	// Handle MCP dialog updates
 	var mcpCmd tea.Cmd
 	model, mcpCmd := cmd.mcpDialog.Update(msg)
 	cmd.mcpDialog = model.(*config.MCPConfigDialog)
-	
+
 	// Check for MCP configuration completion
 	if mcpMsg, ok := msg.(config.MCPConfigMsg); ok {
 		return nil, func() tea.Msg {
@@ -83,7 +85,7 @@ func (cmd *InitCommand) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	
+
 	return cmd.mcpDialog, mcpCmd
 }
 
@@ -107,13 +109,13 @@ func (cmd *InitCommand) createTddProStructure(cwd string) error {
 	if err := os.MkdirAll(tddProDir, 0755); err != nil {
 		return fmt.Errorf("failed to create .tdd-pro directory: %w", err)
 	}
-	
+
 	// Create features directory
 	featuresDir := filepath.Join(tddProDir, "features")
 	if err := os.MkdirAll(featuresDir, 0755); err != nil {
 		return fmt.Errorf("failed to create features directory: %w", err)
 	}
-	
+
 	// Create index.yml file
 	indexPath := filepath.Join(featuresDir, "index.yml")
 	indexContent := `# TDD-Pro Features Index
@@ -128,31 +130,12 @@ backlog: []       # Future features
 # Current feature being worked on (optional)
 current: null
 `
-	
+
 	if err := os.WriteFile(indexPath, []byte(indexContent), 0644); err != nil {
 		return fmt.Errorf("failed to create index.yml: %w", err)
 	}
-	
-	return nil
-}
 
-// isAlreadyInitialized checks if any parent directory contains .tdd-pro
-func isAlreadyInitialized(startDir string) bool {
-	dir := startDir
-	for {
-		tddProPath := filepath.Join(dir, ".tdd-pro")
-		if _, err := os.Stat(tddProPath); err == nil {
-			return true
-		}
-		
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Reached root directory
-			break
-		}
-		dir = parent
-	}
-	return false
+	return nil
 }
 
 // CommandResultMsg represents the result of a command execution

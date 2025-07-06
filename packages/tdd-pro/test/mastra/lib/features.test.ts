@@ -95,7 +95,7 @@ test("getFeatures returns features from features/index.yml", async () => {
 
 test("getFeatures returns empty structure when file doesn't exist", async () => {
   vol.fromJSON({
-    "/project/.tdd-pro/": {}  // Create the .tdd-pro directory but no index file
+    "/project/.tdd-pro/": null  // Create the .tdd-pro directory but no index file
   });
   const result = await features.getFeatures("/project", memfs.promises);
   expect(result).toEqual({ approved: [], planned: [], refinement: [], backlog: [] });
@@ -284,7 +284,7 @@ Using JWT tokens for session management with refresh token rotation.
 
 test("getFeatureDocument creates default PRD when file doesn't exist", async () => {
   vol.fromJSON({
-    "/project/.tdd-pro/": {}
+    "/project/.tdd-pro/": null
   });
 
   const result = await features.getFeatureDocument("/project", "user-auth", memfs.promises);
@@ -302,7 +302,7 @@ test("getFeatureDocument creates default PRD when file doesn't exist", async () 
 
 test("updateFeatureDocument creates and writes PRD content", async () => {
   vol.fromJSON({
-    "/project/.tdd-pro/": {}
+    "/project/.tdd-pro/": null
   });
 
   const newContent = `# Analytics Dashboard
@@ -325,7 +325,7 @@ Using WebSockets for real-time updates and Chart.js for visualization.
   await features.updateFeatureDocument("/project", "analytics", newContent, memfs.promises);
   
   const savedContent = await memfs.promises.readFile("/project/.tdd-pro/features/analytics/prd.md", "utf8");
-  expect(savedContent).toBe(newContent);
+  expect(savedContent.toString()).toBe(newContent);
 });
 
 test("updateFeatureDocument overwrites existing PRD content", async () => {
@@ -339,7 +339,7 @@ test("updateFeatureDocument overwrites existing PRD content", async () => {
   await features.updateFeatureDocument("/project", "existing-feature", newContent, memfs.promises);
   
   const savedContent = await memfs.promises.readFile("/project/.tdd-pro/features/existing-feature/prd.md", "utf8");
-  expect(savedContent).toBe(newContent);
+  expect(savedContent.toString()).toBe(newContent);
 });
 
 test("createFeature creates default prd.md and tasks.yml files", async () => {
@@ -368,15 +368,15 @@ test("createFeature creates default prd.md and tasks.yml files", async () => {
   expect(prdExists).toBe(true);
   
   const prdContent = await memfs.promises.readFile("/project/.tdd-pro/features/payment-system/prd.md", "utf8");
-  expect(prdContent).toContain("# Payment Processing System");
-  expect(prdContent).toContain(longDescription);
+  expect(prdContent.toString()).toContain("# Payment Processing System");
+  expect(prdContent.toString()).toContain(longDescription);
   
   // Check that tasks.yml was created
   const tasksExists = await memfs.promises.stat("/project/.tdd-pro/features/payment-system/tasks.yml").then(() => true).catch(() => false);
   expect(tasksExists).toBe(true);
   
   const tasksContent = await memfs.promises.readFile("/project/.tdd-pro/features/payment-system/tasks.yml", "utf8");
-  const tasks = yaml.load(tasksContent);
+  const tasks = yaml.load(tasksContent.toString()) as any[];
   expect(Array.isArray(tasks)).toBe(true);
   expect(tasks).toHaveLength(0); // Should be an empty array initially
 });
@@ -412,7 +412,7 @@ test("createFeature doesn't overwrite existing prd.md and tasks.yml files", asyn
   expect(prdContent).toBe(existingPrd);
   
   const tasksContent = await memfs.promises.readFile("/project/.tdd-pro/features/existing-feature/tasks.yml", "utf8");
-  const tasks = yaml.load(tasksContent);
+  const tasks = yaml.load(tasksContent.toString()) as any[];
   expect(tasks).toEqual(existingTasks);
 });
 
@@ -507,4 +507,25 @@ test("migrateFeatures converts single current_feature to current_features array"
   const savedData = yaml.load(fileContent);
   expect(savedData.current_features).toEqual(["feature-1"]);
   expect(savedData.current_feature).toBeUndefined();
+});
+
+test("findTddProRoot ignores ~/.tdd-pro and finds project-local .tdd-pro (realistic home structure)", async () => {
+  // Simulate a home install dir and a project dir under home
+  vol.fromJSON({
+    "/home/user/.tdd-pro/features/index.yml": yaml.dump({ approved: [], planned: [], refinement: [], backlog: [] }),
+    "/home/user/project/.tdd-pro/features/index.yml": yaml.dump({ approved: [], planned: [], refinement: [], backlog: [] }),
+    "/home/user/project/subdir/": null
+  });
+  // Patch process.env.HOME for the test
+  const oldHome = process.env.HOME;
+  process.env.HOME = "/home/user";
+  // Patch memfs.promises to add a dummy glob function for compatibility
+  (memfs.promises as any).glob = async () => [];
+  // Import the function directly
+  const { findTddProRoot } = require("../../../src/mastra/lib/features");
+  const result = await findTddProRoot("/home/user/project/subdir", memfs.promises);
+  expect(result.success).toBe(true);
+  expect(result.root).toBe("/home/user/project");
+  // Restore HOME
+  process.env.HOME = oldHome;
 });
