@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # TDD-Pro Installation Script
-# Description: Cross-platform installation script for TDD-Pro
+# Description: User-local installation script for TDD-Pro
 # Usage: curl -fsSL https://raw.githubusercontent.com/tdd-pro/tdd-pro/main/install | bash
 
 set -e
@@ -9,7 +9,7 @@ set -e
 # Configuration
 readonly REPO="tdd-pro/tdd-pro"
 readonly BINARY_NAME="tdd-pro"
-readonly INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
+readonly INSTALL_DIR="$HOME/.tdd-pro/bin"
 readonly VERSION="${VERSION:-latest}"
 
 # User experience configuration
@@ -310,56 +310,21 @@ verify_checksum() {
 
 # Extract and install binary to target directory
 install_binary() {
-    log_info "Installing binary to target directory..."
+    log_info "Installing binary to user-local directory..."
     
     # Determine installation directory
     local install_dir="$INSTALL_DIR"
-    local use_sudo=false
     local extract_dir="$TEMP_DIR/extract"
-    
-    # Check if we can write to the install directory
+
+    # Create the install directory if it doesn't exist
     if [[ ! -d "$install_dir" ]]; then
         log_info "Creating installation directory: $install_dir"
         if ! mkdir -p "$install_dir" 2>/dev/null; then
-            log_warn "Cannot create $install_dir without elevated privileges"
-            use_sudo=true
-        fi
-    elif [[ ! -w "$install_dir" ]]; then
-        log_warn "Cannot write to $install_dir without elevated privileges"
-        use_sudo=true
-    fi
-    
-    # If we need sudo, ask for permission and explain why
-    if [[ "$use_sudo" == "true" ]]; then
-        log_warn "Administrator privileges required for installation to $install_dir"
-        log_info "This is needed to:"
-        log_info "  - Create the installation directory if it doesn't exist"
-        log_info "  - Copy the binary to a system-wide location"
-        log_info "  - Set proper permissions for all users"
-        log_info ""
-        log_info "Alternative: Set INSTALL_DIR environment variable to a user-writable location"
-        log_info "Example: export INSTALL_DIR=~/.local/bin"
-        log_info ""
-        
-        # Check if sudo is available
-        if ! command -v sudo >/dev/null 2>&1; then
-            log_error "sudo is not available, but elevated privileges are required"
-            log_error "Please either:"
-            log_error "  - Install sudo"
-            log_error "  - Run this script as root"
-            log_error "  - Set INSTALL_DIR to a writable location"
-            exit 1
-        fi
-        
-        # Test sudo access
-        log_info "Requesting administrator privileges..."
-        if ! sudo -v; then
-            log_error "Failed to obtain administrator privileges"
-            log_error "Installation cannot continue without write access to $install_dir"
+            log_error "Failed to create $install_dir"
             exit 1
         fi
     fi
-    
+
     # Extract the downloaded tarball
     log_info "Extracting binary from archive..."
     mkdir -p "$extract_dir"
@@ -369,7 +334,7 @@ install_binary() {
         log_error "The downloaded file may be corrupted"
         exit 1
     fi
-    
+
     # Find the binary in the extracted files
     local binary_source
     if [[ -f "$extract_dir/$BINARY_NAME" ]]; then
@@ -386,45 +351,28 @@ install_binary() {
             exit 1
         fi
     fi
-    
+
     log_info "Found binary: $binary_source"
-    
+
     # Install the binary
     local binary_target="$install_dir/$BINARY_NAME"
-    
+
     log_info "Installing to: $binary_target"
-    
-    if [[ "$use_sudo" == "true" ]]; then
-        if ! sudo mkdir -p "$install_dir"; then
-            log_error "Failed to create installation directory with sudo"
-            exit 1
-        fi
-        
-        if ! sudo cp "$binary_source" "$binary_target"; then
-            log_error "Failed to copy binary with sudo"
-            exit 1
-        fi
-        
-        if ! sudo chmod 755 "$binary_target"; then
-            log_error "Failed to set permissions with sudo"
-            exit 1
-        fi
-    else
-        if ! cp "$binary_source" "$binary_target"; then
-            log_error "Failed to copy binary to $binary_target"
-            exit 1
-        fi
-        
-        if ! chmod 755 "$binary_target"; then
-            log_error "Failed to set executable permissions"
-            exit 1
-        fi
+
+    if ! cp "$binary_source" "$binary_target"; then
+        log_error "Failed to copy binary to $binary_target"
+        exit 1
     fi
-    
+
+    if ! chmod 755 "$binary_target"; then
+        log_error "Failed to set executable permissions"
+        exit 1
+    fi
+
     log_info "✅ Binary installed successfully"
     log_info "   Location: $binary_target"
     log_info "   Permissions: $(ls -l "$binary_target" | cut -d' ' -f1)"
-    
+
     # Export for verification step
     export INSTALLED_BINARY="$binary_target"
 }
@@ -607,7 +555,7 @@ USAGE:
   curl -fsSL https://raw.githubusercontent.com/tdd-pro/tdd-pro/main/install | bash
 
 ENVIRONMENT VARIABLES:
-  INSTALL_DIR    Installation directory (default: /usr/local/bin)
+  INSTALL_DIR    Installation directory (default: ~/.tdd-pro/bin)
   VERSION        Version to install (default: latest)
   VERBOSE        Enable verbose output (default: false)
   FORCE          Force reinstallation (default: false)
@@ -632,6 +580,43 @@ For more information, visit: https://github.com/tdd-pro/tdd-pro
 EOF
 }
 
+# Add install dir to PATH if not present
+add_to_path() {
+    local path_entry="export PATH=\"$INSTALL_DIR:\$PATH\""
+    if [[ ":$PATH:" != *":$INSTALL_DIR:"* ]]; then
+        local shell_config=""
+        local current_shell=$(basename "$SHELL")
+        case $current_shell in
+            zsh)
+                shell_config="$HOME/.zshrc"
+                ;;
+            bash)
+                shell_config="$HOME/.bashrc"
+                ;;
+            fish)
+                shell_config="$HOME/.config/fish/config.fish"
+                path_entry="fish_add_path $INSTALL_DIR"
+                ;;
+            *)
+                shell_config="$HOME/.profile"
+                ;;
+        esac
+        if [[ -n "$shell_config" ]]; then
+            if ! grep -q "$INSTALL_DIR" "$shell_config" 2>/dev/null; then
+                echo -e "\n# Added by TDD-Pro installer\n$path_entry" >> "$shell_config"
+                log_info "Added $INSTALL_DIR to PATH in $shell_config"
+            else
+                log_info "$INSTALL_DIR already present in $shell_config"
+            fi
+        else
+            log_warn "Could not detect shell config file. Please add $INSTALL_DIR to your PATH manually."
+        fi
+    else
+        log_info "$INSTALL_DIR already in PATH"
+    fi
+}
+
+# Update post-install instructions
 show_post_install_instructions() {
     log_info ""
     log_info "🎉 Installation completed successfully!"
@@ -645,16 +630,10 @@ show_post_install_instructions() {
     log_info "🐛 Issues:        https://github.com/tdd-pro/tdd-pro/issues"
     log_info "💬 Discussions:   https://github.com/tdd-pro/tdd-pro/discussions"
     log_info ""
-    
-    # PATH reminder if needed
-    if [[ "$INSTALL_DIR" != "/usr/local/bin" && "$INSTALL_DIR" != "/usr/bin" ]]; then
-        log_info "💡 Add to PATH (if not already added):"
-        log_info "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.bashrc"
-        log_info "  echo 'export PATH=\"$INSTALL_DIR:\$PATH\"' >> ~/.zshrc"
-        log_info "  source ~/.bashrc  # or ~/.zshrc"
-        log_info ""
-    fi
-    
+    log_info "If you just installed, you may need to restart your shell or run:"
+    log_info "  export PATH=\"$INSTALL_DIR:\$PATH\""
+    log_info "to use 'tdd-pro' from the command line."
+    log_info ""
     log_info "Thank you for using TDD-Pro! 🚀"
 }
 
@@ -718,15 +697,14 @@ main() {
     install_binary
     log_info "✅ Task 5 completed: Binary installed successfully"
     log_info ""
-    
+    # Add to PATH if needed
+    add_to_path
     # Task 6: Verify installation
     verify_installation
     log_info "✅ Task 6 completed: Installation verified"
     log_info ""
-    
     log_info "🎉 TDD-Pro installation completed successfully!"
     log_info ""
-    
     # Show post-install instructions
     show_post_install_instructions
 }
