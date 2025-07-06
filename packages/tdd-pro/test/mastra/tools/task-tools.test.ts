@@ -3,7 +3,7 @@ import { vol, fs as memfs } from "memfs";
 (memfs.promises as any).glob = async () => [];
 import yaml from "js-yaml";
 import { test, expect, beforeEach } from "vitest";
-import * as tasks from "../../../src/mastra/lib/tasks";
+import * as tasks from "@/lib/tasks";
 
 const cwd = "/project";
 const featureId = "feature-1";

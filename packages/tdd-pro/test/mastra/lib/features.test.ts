@@ -2,7 +2,7 @@ import { vol, fs as memfs } from "memfs";
 import yaml from "js-yaml";
 import { test, expect, beforeEach } from "vitest";
 
-import * as features from "../../../src/mastra/lib/features";
+import * as features from "@/lib/features";
 
 beforeEach(() => {
   vol.reset();
