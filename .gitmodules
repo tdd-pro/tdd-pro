@@ -1,0 +1,18 @@
+[submodule ".agents/examples/ag-ui"]
+	path = .agents/examples/ag-ui
+	url = https://github.com/ag-ui-protocol/ag-ui.git
+[submodule ".agents/examples/bubbletea"]
+	path = .agents/examples/bubbletea
+	url = https://github.com/charmbracelet/bubbletea.git
+[submodule ".agents/examples/bubbles"]
+	path = .agents/examples/bubbles
+	url = https://github.com/charmbracelet/bubbles.git
+[submodule ".agents/examples/lipgloss"]
+	path = .agents/examples/lipgloss
+	url = https://github.com/charmbracelet/lipgloss.git
+[submodule ".agents/examples/mastra"]
+	path = .agents/examples/mastra
+	url = https://github.com/mastra-ai/mastra.git
+[submodule ".agents/examples/huh"]
+	path = .agents/examples/huh
+	url = https://github.com/charmbracelet/huh.git

@@ -1,0 +1,7 @@
+.idea/
+.build/
+.gocache/
+local_test.go
+plan.txt
+*.tar.gz
+mcpb
