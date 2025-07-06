@@ -5,3 +5,16 @@ local_test.go
 plan.txt
 *.tar.gz
 mcpb
+
+# Go build artifacts
+tdd-pro
+tdd-pro-tui
+tddpro
+tddpro-tui
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/

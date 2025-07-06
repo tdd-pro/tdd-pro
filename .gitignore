@@ -6,3 +6,23 @@
 Thumbs.db
 .mcp.json
 .claude
+
+# Build artifacts
+dist/
+build/
+bin/
+*.tar.gz
+*.zip
+
+# Go build artifacts
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*

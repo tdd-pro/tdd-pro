@@ -51,35 +51,35 @@ checksum:
 snapshot:
   name_template: "0.0.0-{{ .Timestamp }}"
 
-# Homebrew tap configuration
-brews:
-  - repository:
-      owner: tdd-pro
-      name: homebrew-tap
-    homepage: "https://github.com/tdd-pro/tdd-pro"
-    description: "AI-Powered Test-Driven Development Agent"
-    license: "MIT"
-    install: |
-      bin.install "tdd-pro"
-    test: |
-      system "#{bin}/tdd-pro", "--version"
+# Homebrew tap configuration (disabled for now)
+# brews:
+#   - repository:
+#       owner: tdd-pro
+#       name: homebrew-tap
+#     homepage: "https://github.com/tdd-pro/tdd-pro"
+#     description: "AI-Powered Test-Driven Development Agent"
+#     license: "MIT"
+#     install: |
+#       bin.install "tdd-pro"
+#     test: |
+#       system "#{bin}/tdd-pro", "--version"
 
-# AUR packages for Arch Linux
-aurs:
-  - name: tdd-pro-bin
-    homepage: "https://github.com/tdd-pro/tdd-pro"
-    description: "AI-Powered Test-Driven Development Agent"
-    maintainers:
-      - "TDD-Pro Team"
-    license: "MIT"
-    private_key: "{{ .Env.AUR_KEY }}"
-    git_url: "ssh://aur@aur.archlinux.org/tdd-pro-bin.git"
-    provides:
-      - tdd-pro
-    conflicts:
-      - tdd-pro
-    package: |-
-      install -Dm755 ./tdd-pro "${pkgdir}/usr/bin/tdd-pro"
+# AUR packages for Arch Linux (disabled for now)
+# aurs:
+#   - name: tdd-pro-bin
+#     homepage: "https://github.com/tdd-pro/tdd-pro"
+#     description: "AI-Powered Test-Driven Development Agent"
+#     maintainers:
+#       - "TDD-Pro Team"
+#     license: "MIT"
+#     private_key: "{{ .Env.AUR_KEY }}"
+#     git_url: "ssh://aur@aur.archlinux.org/tdd-pro-bin.git"
+#     provides:
+#       - tdd-pro
+#     conflicts:
+#       - tdd-pro
+#     package: |-
+#       install -Dm755 ./tdd-pro "${pkgdir}/usr/bin/tdd-pro"
 
 # Debian/RPM packages
 nfpms:
