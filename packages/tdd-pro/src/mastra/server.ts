@@ -1,7 +1,7 @@
 import { createServer, IncomingMessage, ServerResponse } from 'http';
 import { MCPServer } from '@mastra/mcp';
-import { tddAgent } from './agents/coordinator';
-import { tddProTools } from './tools/tdd-tools';
+import { tddAgent } from '@/agents/coordinator';
+import { tddProTools } from '@/tools/tdd-tools';
 
 // Create the MCPServer and register your agent and tools
 const server = new MCPServer({

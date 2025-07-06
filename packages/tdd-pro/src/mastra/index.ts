@@ -3,9 +3,9 @@ import { PinoLogger } from '@mastra/loggers';
 import { LibSQLStore } from '@mastra/libsql';
 import { MCPServer } from '@mastra/mcp';
 
-import { tddPlanningWorkflow } from './workflows/tdd-workflow';
-import { featureTools } from './tools/feature-tools';
-import { taskTools } from './tools/task-tools';
+import { tddPlanningWorkflow } from '@/workflows/tdd-workflow';
+import { featureTools } from '@/tools/feature-tools';
+import { taskTools } from '@/tools/task-tools';
 
 const tddproServer = new MCPServer({
   name: 'TDD-Pro MCP Server',

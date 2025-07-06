@@ -3,8 +3,8 @@ import { vol, fs as memfs } from "memfs";
 (memfs.promises as any).glob = async () => [];
 import { test, expect, beforeEach } from "vitest";
 import yaml from "js-yaml";
-import * as featuresModule from "../../../src/mastra/lib/features";
-import { createFeature } from "../../../src/mastra/tools/feature-tools";
+import * as featuresModule from "@/lib/features";
+import { createFeature } from "@/tools/feature-tools";
 
 const cwd = "/project";
 const featureId = "archive-me";

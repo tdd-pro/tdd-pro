@@ -1,6 +1,6 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import * as features from "../lib/features";
+import * as features from "@/lib/features";
 
 // Feature Item Schema
 const FeatureItemSchema = z.object({

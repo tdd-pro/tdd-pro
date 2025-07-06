@@ -1,6 +1,6 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
-import * as tasks from "../lib/tasks";
+import * as tasks from "@/lib/tasks";
 
 // TDD-Pro Task Tools: Persona Usage Guide
 // - Planner/Refiner: Use refineFeature, refineFeatureTasks, etc. for requirements and task breakdown.

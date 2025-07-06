@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"tddpro/internal/commands"
 	"tddpro/internal/mcpclient"
 	"tddpro/internal/streams"
+	"tddpro/internal/util"
 
 	"github.com/charmbracelet/bubbles/textarea"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -42,23 +42,23 @@ type Prompt struct {
 	SelectedFeature    *mcpclient.Feature
 	WindowHeight       int
 	WindowWidth        int
-	
+
 	// Scrolling state
-	sidebarScroll    int // Workflow panel scroll offset
-	mainPanelScroll  int // Feature panel scroll offset
-	
+	sidebarScroll   int // Workflow panel scroll offset
+	mainPanelScroll int // Feature panel scroll offset
+
 	// Focus state - 0=Workflow, 1=Feature Data, 2=Feature Tasks
-	focusState       int
-	
+	focusState int
+
 	// Task selection state
-	selectedTaskIndex int    // Which task is selected in Tasks view
-	editingTask       bool   // Whether we're in task edit mode
+	selectedTaskIndex int  // Which task is selected in Tasks view
+	editingTask       bool // Whether we're in task edit mode
 	taskEditForm      *TaskEditForm
 
 	// PRD editing state
-	editingPRD      bool            // Whether we're in PRD edit mode
-	prdEditTextarea textarea.Model  // Multiline text area for PRD editing
-	prdOriginal     string          // Original content before editing
+	editingPRD      bool           // Whether we're in PRD edit mode
+	prdEditTextarea textarea.Model // Multiline text area for PRD editing
+	prdOriginal     string         // Original content before editing
 
 	// Feature metadata editing state
 	featureNameEdit        textinput.Model // Always editable feature name
@@ -281,25 +281,6 @@ func handleInit(p *Prompt, arg string) (*Prompt, tea.Cmd) {
 	return p, cmd
 }
 
-// isAlreadyInitialized checks if any parent directory contains .tdd-pro
-func isAlreadyInitialized(startDir string) bool {
-	dir := startDir
-	for {
-		tddProPath := filepath.Join(dir, ".tdd-pro")
-		if _, err := os.Stat(tddProPath); err == nil {
-			return true
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Reached root directory
-			break
-		}
-		dir = parent
-	}
-	return false
-}
-
 func handleDestroy(p *Prompt, arg string) (*Prompt, tea.Cmd) {
 	// Get current working directory or use provided argument
 	cwd := arg
@@ -314,7 +295,7 @@ func handleDestroy(p *Prompt, arg string) (*Prompt, tea.Cmd) {
 	}
 
 	// Find the .tdd-pro directory (check current and parent directories)
-	tddProDir := findTddProDirectory(cwd)
+	tddProDir := util.FindTddProDirectory(cwd, os.Stat)
 	if tddProDir == "" {
 		p.StatusBar = "No TDD-Pro project found in current or parent directories"
 		p.textInput.SetValue("")
@@ -327,25 +308,6 @@ func handleDestroy(p *Prompt, arg string) (*Prompt, tea.Cmd) {
 	p.StatusBar = ""
 	p.textInput.SetValue("")
 	return p, nil
-}
-
-// findTddProDirectory finds the .tdd-pro directory in current or parent directories
-func findTddProDirectory(startDir string) string {
-	dir := startDir
-	for {
-		tddProPath := filepath.Join(dir, ".tdd-pro")
-		if _, err := os.Stat(tddProPath); err == nil {
-			return tddProPath
-		}
-
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			// Reached root directory
-			break
-		}
-		dir = parent
-	}
-	return ""
 }
 
 func handleQuit(p *Prompt, arg string) (*Prompt, tea.Cmd) {
@@ -377,13 +339,13 @@ func (p *Prompt) Update(msg tea.Msg) (*Prompt, tea.Cmd) {
 		_, cmd := p.authCommand.Update(msg)
 		return p, cmd
 	}
-	
+
 	// Handle task edit form updates
 	if p.editingTask && p.taskEditForm != nil && p.taskEditForm.IsVisible() {
 		_, cmd := p.taskEditForm.Update(msg)
 		return p, cmd
 	}
-	
+
 	// Handle PRD edit input updates
 	if p.editingPRD {
 		switch keyMsg := msg.(type) {
@@ -418,32 +380,32 @@ func (p *Prompt) Update(msg tea.Msg) (*Prompt, tea.Cmd) {
 		}
 		return p, nil
 	}
-	
+
 	// Handle task edit completion/cancellation
 	if editCompleteMsg, ok := msg.(TaskEditCompleteMsg); ok {
 		p.editingTask = false
 		p.taskEditForm = nil
-		
+
 		// Save the task changes via MCP
 		if p.SelectedFeature != nil && p.MCP != nil {
 			go func() {
 				// Get the current task being edited
 				if featureDetail, err := p.MCP.GetFeatureViaStdio(p.SelectedFeature.ID); err == nil && p.selectedTaskIndex < len(featureDetail.Tasks) {
 					task := featureDetail.Tasks[p.selectedTaskIndex]
-					
+
 					// Create updates map with the edited values
 					updates := map[string]interface{}{
 						"name":                editCompleteMsg.Title,
 						"description":         editCompleteMsg.Description,
 						"acceptance_criteria": editCompleteMsg.Criteria,
 					}
-					
+
 					// Save via MCP
 					if err := p.MCP.UpdateTaskViaStdio(p.SelectedFeature.ID, task.ID, updates); err != nil {
 						// Handle error (could send error message to UI)
 						return
 					}
-					
+
 					// Refresh the feature data to show updated task
 					if updatedDetail, err := p.MCP.GetFeatureViaStdio(p.SelectedFeature.ID); err == nil {
 						// Update the tasks in memory
@@ -460,18 +422,18 @@ func (p *Prompt) Update(msg tea.Msg) (*Prompt, tea.Cmd) {
 				}
 			}()
 		}
-		
+
 		p.StatusBar = "Task edited: " + editCompleteMsg.Title
 		return p, nil
 	}
-	
+
 	if _, ok := msg.(TaskEditCancelMsg); ok {
 		p.editingTask = false
 		p.taskEditForm = nil
 		p.StatusBar = "Task edit cancelled"
 		return p, nil
 	}
-	
+
 	// Handle external PRD edit completion
 	if prdResult, ok := msg.(PRDEditResultMsg); ok {
 		if prdResult.Success {
@@ -490,7 +452,6 @@ func (p *Prompt) Update(msg tea.Msg) (*Prompt, tea.Cmd) {
 		}
 		return p, nil
 	}
-	
 
 	// Handle completion selection
 	if msg, ok := msg.(CompletionSelectedMsg); ok {
@@ -542,7 +503,7 @@ func (p *Prompt) Update(msg tea.Msg) (*Prompt, tea.Cmd) {
 				if m.String() == "enter" {
 					return p.saveFeatureChanges()
 				}
-				
+
 				// Allow text input for feature name and description (but not for navigation keys)
 				switch m.String() {
 				case "esc", "left", "right", "up", "down", "e", "t", "d", "tab":
@@ -561,7 +522,7 @@ func (p *Prompt) Update(msg tea.Msg) (*Prompt, tea.Cmd) {
 					return p, nil
 				}
 			}
-			
+
 			switch m.String() {
 			case "esc":
 				p.FeaturesViewActive = false
@@ -632,7 +593,7 @@ func (p *Prompt) Update(msg tea.Msg) (*Prompt, tea.Cmd) {
 						p.StatusBar = fmt.Sprintf("Not in Tasks tab (tab=%d). Press 't' or right arrow to switch to Tasks.", p.FeaturesTab)
 						return p, nil
 					}
-					
+
 					// Get tasks to verify the selected index is valid
 					if featureDetail, err := p.MCP.GetFeatureViaStdio(p.SelectedFeature.ID); err == nil {
 						if p.selectedTaskIndex >= len(featureDetail.Tasks) {
@@ -651,7 +612,7 @@ func (p *Prompt) Update(msg tea.Msg) (*Prompt, tea.Cmd) {
 						p.StatusBar = "Not in Feature Data tab. Press 'd' to switch to Feature Data view."
 						return p, nil
 					}
-					
+
 					p.StatusBar = fmt.Sprintf("Opening PRD editor for feature: %s", p.SelectedFeature.Name)
 					return p.startPRDEdit()
 				} else {
@@ -673,7 +634,7 @@ func (p *Prompt) Update(msg tea.Msg) (*Prompt, tea.Cmd) {
 				p.StatusBar = "Switched to Tasks view"
 				return p, nil
 			case "d":
-				// Quick switch to Data tab  
+				// Quick switch to Data tab
 				p.FeaturesTab = 0
 				p.focusState = 1
 				p.mainPanelScroll = 0
@@ -880,20 +841,20 @@ func (p *Prompt) View() string {
 	// Header
 	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("81")).Bold(true).Padding(0, 1)
 	header := headerStyle.Render("TDD-Pro TUI v0.1.0")
-	
+
 	// If PRD editing is active, show the textarea overlay
 	if p.editingPRD {
 		editHeader := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("39")).
 			Bold(true).
 			Render("Editing PRD Document")
-		
+
 		textareaView := p.prdEditTextarea.View()
 		statusBar := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render(p.StatusBar)
-		
+
 		return lipgloss.JoinVertical(lipgloss.Left, header, "", editHeader, "", textareaView, "", statusBar)
 	}
-	
+
 	if p.FeaturesViewActive {
 		// Create sidebar content
 		sidebar := p.generateSidebarContent()
@@ -912,7 +873,7 @@ func (p *Prompt) View() string {
 			// Create tab-style UI using proper lipgloss pattern
 			dataTabText := "Feature Spec (d)"
 			tasksTabText := "Tasks (t)"
-			
+
 			// Define borders following lipgloss example
 			activeTabBorder := lipgloss.Border{
 				Top:         "─",
@@ -948,7 +909,7 @@ func (p *Prompt) View() string {
 				BorderTop(false).
 				BorderLeft(false).
 				BorderRight(false)
-			
+
 			// Calculate available width
 			terminalWidth := p.WindowWidth
 			if terminalWidth < 80 {
@@ -959,7 +920,7 @@ func (p *Prompt) View() string {
 				sidebarWidth = terminalWidth / 3
 			}
 			tabBarWidth := terminalWidth - sidebarWidth - 108 // Account for panel borders and padding, reduced by 100
-			
+
 			// Render tabs following lipgloss pattern
 			var row string
 			if p.FeaturesTab == 0 {
@@ -977,14 +938,14 @@ func (p *Prompt) View() string {
 					activeTab.Render(tasksTabText),
 				)
 			}
-			
+
 			// Add gap to fill remaining width (this creates the bottom line)
 			remainingWidth := tabBarWidth - lipgloss.Width(row)
 			if remainingWidth > 0 {
 				gap := tabGap.Render(strings.Repeat(" ", remainingWidth))
 				row = lipgloss.JoinHorizontal(lipgloss.Bottom, row, gap)
 			}
-			
+
 			main += row + "\n\n"
 
 			if p.FeaturesTab == 0 {
@@ -1000,7 +961,7 @@ func (p *Prompt) View() string {
 		if terminalWidth < 80 {
 			terminalWidth = 80 // Minimum width
 		}
-		
+
 		// Sidebar should be max 30 chars, but scale down for narrow terminals
 		sidebarWidth := 30
 		if terminalWidth < 100 {
@@ -1009,29 +970,29 @@ func (p *Prompt) View() string {
 		if sidebarWidth < 20 {
 			sidebarWidth = 20
 		}
-		
+
 		// Main panel gets the rest minus some padding
 		mainWidth := terminalWidth - sidebarWidth - 4 // 4 for spacing/borders
-		
+
 		// Calculate scrollable heights to span full available space
 		// The panels should take up the full availHeight (from top to prompt line)
-		sidebarContentHeight := availHeight - 2 // -2 for top/bottom borders only  
+		sidebarContentHeight := availHeight - 2 // -2 for top/bottom borders only
 		mainContentHeight := availHeight - 2
-		
+
 		// Apply scrolling to content
 		scrollableSidebar := renderScrollableContent(sidebar, sidebarContentHeight, p.sidebarScroll)
 		scrollableMain := renderScrollableContent(main, mainContentHeight, p.mainPanelScroll)
-		
+
 		// Determine border colors based on focus state
 		sidebarBorderColor := "240" // Default border color
 		mainBorderColor := "240"
-		
+
 		if p.focusState == 0 {
 			sidebarBorderColor = "39" // Blue for focused workflow panel
 		} else if p.focusState == 1 || p.focusState == 2 {
 			mainBorderColor = "39" // Blue for focused feature panel
 		}
-		
+
 		// Use custom border title function for Bagels-style panels with focus colors
 		sidebarPanel := renderPanelWithTitleColorAndHeight(scrollableSidebar, "Workflow", sidebarWidth, 1, sidebarBorderColor, availHeight)
 		mainPanel := renderPanelWithTitleColorAndHeight(scrollableMain, "Feature", mainWidth, 2, mainBorderColor, availHeight)
@@ -1075,7 +1036,7 @@ func (p *Prompt) View() string {
 		} else {
 			statusArea = "Ready"
 		}
-		
+
 		statusView := statusBarStyle.Render(shortcuts)
 		return header + "\n" + row + "\n" + statusArea + "\n" + statusView
 	}
@@ -1096,7 +1057,6 @@ func (p *Prompt) View() string {
 			thinkingView += "[thinking] " + msg + "\n"
 		}
 	}
-
 
 	// Show destroy confirmation dialog if active
 	if p.destroyConfirmActive {
@@ -1138,7 +1098,7 @@ func (p *Prompt) View() string {
 	if p.authCommand != nil && p.authCommand.IsActive() {
 		return header + "\n" + p.authCommand.View()
 	}
-	
+
 	// Don't show task edit form as overlay - it will be rendered inline in the task list
 
 	// Style the textinput with Bagels theme - no background for clean look
@@ -1191,14 +1151,14 @@ func renderPanelWithTitleColorAndHeight(content string, title string, width int,
 	if len(lines) == 0 {
 		lines = []string{""}
 	}
-	
+
 	// If exactHeight is specified, adjust lines to fit exactly
 	if exactHeight > 0 {
 		targetContentLines := exactHeight - 2 // -2 for top and bottom borders
 		if targetContentLines < 1 {
 			targetContentLines = 1
 		}
-		
+
 		// Pad or truncate lines to match target
 		for len(lines) < targetContentLines {
 			lines = append(lines, "")
@@ -1297,17 +1257,17 @@ func (p *Prompt) moveTaskSelection(delta int) {
 	if p.SelectedFeature == nil || p.MCP == nil {
 		return
 	}
-	
+
 	// Get current tasks for the feature
 	featureDetail, err := p.MCP.GetFeatureViaStdio(p.SelectedFeature.ID)
 	if err != nil || len(featureDetail.Tasks) == 0 {
 		return
 	}
-	
+
 	// Update selected task index with bounds checking
 	oldIndex := p.selectedTaskIndex
 	p.selectedTaskIndex = (p.selectedTaskIndex + delta + len(featureDetail.Tasks)) % len(featureDetail.Tasks)
-	
+
 	// Auto-scroll to keep selected task visible
 	if oldIndex != p.selectedTaskIndex {
 		p.ensureTaskVisible()
@@ -1319,43 +1279,43 @@ func (p *Prompt) ensureTaskVisible() {
 	if p.SelectedFeature == nil || p.MCP == nil {
 		return
 	}
-	
+
 	// Calculate available height for task content
 	mainContentHeight := p.WindowHeight - 8 // Account for header, borders, prompt, status
 	if mainContentHeight < 1 {
 		mainContentHeight = 1
 	}
-	
+
 	// Get tasks to calculate task positions
 	featureDetail, err := p.MCP.GetFeatureViaStdio(p.SelectedFeature.ID)
 	if err != nil || len(featureDetail.Tasks) == 0 {
 		return
 	}
-	
+
 	// Estimate lines per task (header + description + criteria + borders + margins)
 	// This is approximate - each task takes roughly 6-8 lines depending on content
 	linesPerTask := 8
-	
+
 	// Calculate position of selected task in lines
 	selectedTaskLine := p.selectedTaskIndex * linesPerTask
-	
+
 	// Adjust scroll if selected task is outside visible area
 	visibleStart := p.mainPanelScroll
 	visibleEnd := p.mainPanelScroll + mainContentHeight
-	
+
 	if selectedTaskLine < visibleStart {
 		// Task is above visible area - scroll up
 		p.mainPanelScroll = selectedTaskLine
-	} else if selectedTaskLine + linesPerTask > visibleEnd {
+	} else if selectedTaskLine+linesPerTask > visibleEnd {
 		// Task is below visible area - scroll down
 		p.mainPanelScroll = selectedTaskLine - mainContentHeight + linesPerTask
 	}
-	
+
 	// Ensure scroll doesn't go negative
 	if p.mainPanelScroll < 0 {
 		p.mainPanelScroll = 0
 	}
-	
+
 	// Ensure scroll doesn't exceed maximum
 	maxScroll := p.getMaxMainPanelScroll()
 	if p.mainPanelScroll > maxScroll {
@@ -1368,22 +1328,22 @@ func (p *Prompt) renderTasksForFeature(feature *mcpclient.Feature) string {
 	if feature == nil {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("No feature selected") + "\n"
 	}
-	
+
 	// Try to get feature details with tasks from MCP
 	if p.MCP != nil {
 		featureDetail, err := p.MCP.GetFeatureViaStdio(feature.ID)
 		if err != nil {
-			return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("Error loading tasks: " + err.Error()) + "\n"
+			return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("Error loading tasks: "+err.Error()) + "\n"
 		}
-		
+
 		if len(featureDetail.Tasks) == 0 {
 			return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("No tasks defined for this feature") + "\n"
 		}
-		
+
 		var result strings.Builder
 		for i, task := range featureDetail.Tasks {
 			isSelected := (i == p.selectedTaskIndex)
-			
+
 			// If this is the task being edited, show the form instead of the task box
 			if p.editingTask && isSelected && p.taskEditForm != nil {
 				editBox := p.renderTaskEditForm(task, i+1)
@@ -1394,10 +1354,10 @@ func (p *Prompt) renderTasksForFeature(feature *mcpclient.Feature) string {
 			}
 			// No padding between tasks - they connect visually
 		}
-		
+
 		return result.String()
 	}
-	
+
 	return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("MCP client not available") + "\n"
 }
 
@@ -1421,7 +1381,7 @@ func (p *Prompt) startTaskEdit() (*Prompt, tea.Cmd) {
 		p.StatusBar = "MCP client not available"
 		return p, nil
 	}
-	
+
 	// Get the selected task
 	featureDetail, err := p.MCP.GetFeatureViaStdio(p.SelectedFeature.ID)
 	if err != nil {
@@ -1436,10 +1396,10 @@ func (p *Prompt) startTaskEdit() (*Prompt, tea.Cmd) {
 		p.StatusBar = fmt.Sprintf("Task index %d out of bounds (have %d tasks)", p.selectedTaskIndex, len(featureDetail.Tasks))
 		return p, nil
 	}
-	
+
 	selectedTask := featureDetail.Tasks[p.selectedTaskIndex]
 	p.StatusBar = fmt.Sprintf("DEBUG: Creating form for task: %s", selectedTask.Title)
-	
+
 	// Create the edit form
 	p.taskEditForm = &TaskEditForm{
 		visible:     true,
@@ -1447,12 +1407,12 @@ func (p *Prompt) startTaskEdit() (*Prompt, tea.Cmd) {
 		description: selectedTask.Description,
 		criteria:    selectedTask.EvaluationCriteria,
 	}
-	
+
 	p.taskEditForm.buildForm()
 	p.editingTask = true
-	
+
 	p.StatusBar = fmt.Sprintf("DEBUG: Form created, editingTask=%v, visible=%v", p.editingTask, p.taskEditForm.visible)
-	
+
 	return p, p.taskEditForm.Init()
 }
 
@@ -1460,10 +1420,10 @@ func (p *Prompt) startTaskEdit() (*Prompt, tea.Cmd) {
 func (f *TaskEditForm) buildForm() {
 	// Convert criteria slice to newline-separated string for easier editing
 	criteriaText := strings.Join(f.criteria, "\n")
-	
+
 	// Store the criteria text as a field we can reference
 	f.criteriaText = criteriaText
-	
+
 	f.form = huh.NewForm(
 		huh.NewGroup(
 			huh.NewInput().
@@ -1471,14 +1431,14 @@ func (f *TaskEditForm) buildForm() {
 				Title("Task Title").
 				Value(&f.title).
 				Placeholder("Enter task title..."),
-			
+
 			huh.NewText().
 				Key("description").
 				Title("Description").
 				Value(&f.description).
 				Placeholder("Enter task description...").
 				Lines(3),
-			
+
 			huh.NewText().
 				Key("criteria").
 				Title("Acceptance Criteria (one per line)").
@@ -1490,7 +1450,7 @@ func (f *TaskEditForm) buildForm() {
 		WithTheme(huh.ThemeDracula()).
 		WithShowHelp(true).
 		WithShowErrors(true)
-	
+
 	// Debug: ensure form was created
 	if f.form == nil {
 		fmt.Printf("DEBUG: Failed to create huh form\n")
@@ -1512,7 +1472,7 @@ func (f *TaskEditForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	if !f.visible || f.form == nil {
 		return f, nil
 	}
-	
+
 	// Handle escape to cancel
 	if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "esc" {
 		f.visible = false
@@ -1520,17 +1480,17 @@ func (f *TaskEditForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return TaskEditCancelMsg{}
 		}
 	}
-	
+
 	// Update form
 	form, cmd := f.form.Update(msg)
 	if updatedForm, ok := form.(*huh.Form); ok {
 		f.form = updatedForm
 	}
-	
+
 	// Check if form is completed
 	if f.form.State == huh.StateCompleted {
 		f.visible = false
-		
+
 		// Parse criteria back to slice
 		criteria := []string{}
 		for _, line := range strings.Split(f.criteriaText, "\n") {
@@ -1539,7 +1499,7 @@ func (f *TaskEditForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				criteria = append(criteria, line)
 			}
 		}
-		
+
 		return f, func() tea.Msg {
 			return TaskEditCompleteMsg{
 				Title:       f.form.GetString("title"),
@@ -1548,7 +1508,7 @@ func (f *TaskEditForm) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
-	
+
 	return f, cmd
 }
 
@@ -1560,28 +1520,28 @@ func (f *TaskEditForm) View() string {
 	if f.form == nil {
 		return "DEBUG: Form is nil"
 	}
-	
+
 	// Add header
 	headerStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true).
 		Padding(0, 1)
-	
+
 	header := headerStyle.Render("📝 Edit Task")
-	
+
 	// Get form view with debugging
 	formView := f.form.View()
 	if formView == "" {
 		return "DEBUG: huh form.View() returned empty string\nForm state: " + fmt.Sprintf("%+v", f.form.State) + "\nPress ESC to cancel"
 	}
-	
+
 	// Style the form
 	dialogStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("39")).
 		Padding(1, 2).
 		Width(80)
-	
+
 	content := header + "\n\n" + formView
 	return dialogStyle.Render(content)
 }
@@ -1603,14 +1563,14 @@ type TaskEditCancelMsg struct{}
 // renderTaskBox creates a styled box for a single task
 func (p *Prompt) renderTaskBox(task mcpclient.Task, taskNumber int, isSelected bool) string {
 	// Use blue colors for selected task, gray for unselected
-	borderColor := "240" // Default gray
+	borderColor := "240"   // Default gray
 	headerBgColor := "240" // Default gray
-	
+
 	if isSelected {
-		borderColor = "39" // Blue border for selected task
+		borderColor = "39"   // Blue border for selected task
 		headerBgColor = "39" // Blue header background for selected task
 	}
-	
+
 	// Calculate available width for the task boxes
 	terminalWidth := p.WindowWidth
 	if terminalWidth < 80 {
@@ -1625,9 +1585,9 @@ func (p *Prompt) renderTaskBox(task mcpclient.Task, taskNumber int, isSelected b
 	if contentWidth < 40 {
 		contentWidth = 40
 	}
-	
+
 	var result strings.Builder
-	
+
 	// Task header with gray background - FULL WIDTH minus internal spacing
 	headerText := fmt.Sprintf("Task %d: %s", taskNumber, task.Title)
 	headerStyle := lipgloss.NewStyle().
@@ -1636,42 +1596,42 @@ func (p *Prompt) renderTaskBox(task mcpclient.Task, taskNumber int, isSelected b
 		Bold(true).
 		Padding(0, 1).
 		Width(contentWidth - 0) // -4 for box borders (2) + internal padding (2)
-	
+
 	result.WriteString(headerStyle.Render(headerText) + "\n")
-	
+
 	// Task description - simple styling
 	descStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("248")).
 		Padding(1, 1, 0, 1) // top, right, bottom, left
-	
+
 	result.WriteString(descStyle.Render(task.Description) + "\n")
-	
+
 	// Acceptance criteria
 	if len(task.EvaluationCriteria) > 0 {
 		criteriaHeaderStyle := lipgloss.NewStyle().
 			Foreground(lipgloss.Color("214")).
 			Bold(true).
 			Padding(0, 1)
-		
+
 		result.WriteString(criteriaHeaderStyle.Render("Acceptance Criteria:") + "\n")
-		
+
 		for i, criteria := range task.EvaluationCriteria {
 			testStyle := lipgloss.NewStyle().
 				Foreground(lipgloss.Color("245")).
 				PaddingLeft(3)
-			
+
 			testLine := fmt.Sprintf("⧖ Test %d: %s", i+1, criteria)
 			result.WriteString(testStyle.Render(testLine) + "\n")
 		}
 	}
-	
+
 	// Wrap everything in a simple border with consistent width
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color(borderColor)).
 		Width(contentWidth).
 		Margin(0, 0, 1, 0) // Just bottom margin between tasks
-	
+
 	return boxStyle.Render(result.String())
 }
 
@@ -1690,9 +1650,9 @@ func (p *Prompt) renderTaskEditForm(task mcpclient.Task, taskNumber int) string 
 	if contentWidth < 40 {
 		contentWidth = 40
 	}
-	
+
 	var result strings.Builder
-	
+
 	// Header showing we're editing this task
 	headerText := fmt.Sprintf("✏️ Editing Task %d", taskNumber)
 	headerStyle := lipgloss.NewStyle().
@@ -1701,34 +1661,34 @@ func (p *Prompt) renderTaskEditForm(task mcpclient.Task, taskNumber int) string 
 		Bold(true).
 		Padding(0, 1).
 		Width(contentWidth)
-	
+
 	result.WriteString(headerStyle.Render(headerText) + "\n")
-	
+
 	// Simple inline form using basic text styling instead of huh
-	
+
 	labelStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("39")).
 		Bold(true).
 		Padding(0, 1)
-	
+
 	valueStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("248")).
 		Background(lipgloss.Color("236")).
 		Padding(0, 1).
 		Width(contentWidth - 4)
-	
+
 	// Title field
 	result.WriteString(labelStyle.Render("Title:") + "\n")
 	if p.taskEditForm != nil {
 		result.WriteString(valueStyle.Render(p.taskEditForm.title) + "\n\n")
 	}
-	
-	// Description field  
+
+	// Description field
 	result.WriteString(labelStyle.Render("Description:") + "\n")
 	if p.taskEditForm != nil {
 		result.WriteString(valueStyle.Render(p.taskEditForm.description) + "\n\n")
 	}
-	
+
 	// Criteria field
 	result.WriteString(labelStyle.Render("Acceptance Criteria:") + "\n")
 	if p.taskEditForm != nil && len(p.taskEditForm.criteria) > 0 {
@@ -1737,22 +1697,22 @@ func (p *Prompt) renderTaskEditForm(task mcpclient.Task, taskNumber int) string 
 			result.WriteString(valueStyle.Render(criteriaLine) + "\n")
 		}
 	}
-	
+
 	// Instructions
 	instructStyle := lipgloss.NewStyle().
 		Foreground(lipgloss.Color("245")).
 		Italic(true).
 		Padding(1, 1, 0, 1)
-	
+
 	result.WriteString(instructStyle.Render("Press ENTER to edit in external editor, ESC to cancel") + "\n")
-	
+
 	// Wrap in a box with blue border to show it's being edited
 	boxStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("39")).
 		Width(contentWidth).
 		Margin(0, 0, 1, 0)
-	
+
 	return boxStyle.Render(result.String())
 }
 
@@ -1761,13 +1721,13 @@ func renderScrollableContent(content string, maxHeight int, scrollOffset int) st
 	if content == "" {
 		return ""
 	}
-	
+
 	lines := strings.Split(content, "\n")
-	
+
 	// Calculate visible range
 	start := scrollOffset
 	end := scrollOffset + maxHeight
-	
+
 	// Bounds checking
 	if start < 0 {
 		start = 0
@@ -1787,15 +1747,15 @@ func renderScrollableContent(content string, maxHeight int, scrollOffset int) st
 			end = len(lines)
 		}
 	}
-	
+
 	// Get visible lines
 	visibleLines := lines[start:end]
-	
+
 	// Pad to fill maxHeight if needed
 	for len(visibleLines) < maxHeight && len(visibleLines) < len(lines) {
 		visibleLines = append(visibleLines, "")
 	}
-	
+
 	return strings.Join(visibleLines, "\n")
 }
 
@@ -1812,16 +1772,16 @@ func (p *Prompt) getMaxSidebarScroll() int {
 	if !p.FeaturesViewActive {
 		return 0
 	}
-	
+
 	sidebarContentHeight := p.WindowHeight - 8 // Account for header, borders, prompt, status
 	if sidebarContentHeight < 1 {
 		sidebarContentHeight = 1
 	}
-	
+
 	// Generate sidebar content to measure its height
 	sidebar := p.generateSidebarContent()
 	contentHeight := getContentHeight(sidebar)
-	
+
 	maxScroll := contentHeight - sidebarContentHeight
 	if maxScroll < 0 {
 		maxScroll = 0
@@ -1834,12 +1794,12 @@ func (p *Prompt) getMaxMainPanelScroll() int {
 	if !p.FeaturesViewActive || p.SelectedFeature == nil {
 		return 0
 	}
-	
+
 	mainContentHeight := p.WindowHeight - 8 // Account for header, borders, prompt, status
 	if mainContentHeight < 1 {
 		mainContentHeight = 1
 	}
-	
+
 	// Generate main content based on current tab
 	var content string
 	if p.FeaturesTab == 0 {
@@ -1847,7 +1807,7 @@ func (p *Prompt) getMaxMainPanelScroll() int {
 	} else {
 		content = p.renderTasksForFeature(p.SelectedFeature)
 	}
-	
+
 	contentHeight := getContentHeight(content)
 	maxScroll := contentHeight - mainContentHeight
 	if maxScroll < 0 {
@@ -1859,7 +1819,7 @@ func (p *Prompt) getMaxMainPanelScroll() int {
 // generateSidebarContent creates the sidebar content for measuring
 func (p *Prompt) generateSidebarContent() string {
 	sidebar := ""
-	
+
 	appendGroup := func(label string, features []mcpclient.Feature, color string) {
 		groupStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Bold(true)
 		sidebar += groupStyle.Render(label) + ":\n"
@@ -1876,7 +1836,7 @@ func (p *Prompt) generateSidebarContent() string {
 		}
 		sidebar += "\n"
 	}
-	
+
 	// Build current features list by filtering from all features
 	currentFeatures := []mcpclient.Feature{}
 	if len(p.FeaturesData.CurrentFeatures) > 0 {
@@ -1885,7 +1845,7 @@ func (p *Prompt) generateSidebarContent() string {
 		for _, id := range p.FeaturesData.CurrentFeatures {
 			currentMap[id] = true
 		}
-		
+
 		// Collect current features from all status groups
 		allFeatures := append(append(append(p.FeaturesData.Approved, p.FeaturesData.Planned...), p.FeaturesData.Refinement...), p.FeaturesData.Backlog...)
 		for _, feature := range allFeatures {
@@ -1894,12 +1854,12 @@ func (p *Prompt) generateSidebarContent() string {
 			}
 		}
 	}
-	
+
 	appendGroup("Current", currentFeatures, "46")             // Green
 	appendGroup("Accepted", p.FeaturesData.Approved, "39")    // Blue
 	appendGroup("Refining", p.FeaturesData.Refinement, "214") // Orange
 	appendGroup("Backlog", p.FeaturesData.Backlog, "245")     // Gray
-	
+
 	return sidebar
 }
 
@@ -1908,18 +1868,18 @@ func (p *Prompt) generateFeatureDataContent(feature *mcpclient.Feature) string {
 	if feature == nil {
 		return ""
 	}
-	
+
 	// Sync text input values with the selected feature (if not already synced)
 	p.syncFeatureInputs(feature)
-	
+
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Bold(true)
 	valueStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("255"))
-	
+
 	var content string
-	
+
 	// ID (not editable)
 	content += labelStyle.Render("ID: ") + valueStyle.Render(feature.ID) + "\n"
-	
+
 	// Editable Name field
 	content += labelStyle.Render("Name: ") + "\n"
 	if p.focusState == 1 {
@@ -1929,7 +1889,7 @@ func (p *Prompt) generateFeatureDataContent(feature *mcpclient.Feature) string {
 		// Show as static text when not focused
 		content += "  " + valueStyle.Render(p.featureNameEdit.Value()) + "\n"
 	}
-	
+
 	// Editable Description field
 	content += labelStyle.Render("Description: ") + "\n"
 	if p.focusState == 1 {
@@ -1939,14 +1899,14 @@ func (p *Prompt) generateFeatureDataContent(feature *mcpclient.Feature) string {
 		// Show as static text when not focused
 		content += "  " + valueStyle.Render(p.featureDescriptionEdit.Value()) + "\n"
 	}
-	
+
 	// Status (not editable for now)
 	content += labelStyle.Render("Status: ") + valueStyle.Render(feature.Status) + "\n\n"
-	
+
 	// Add PRD document section
 	content += labelStyle.Render("Product Requirements Document:") + "\n"
 	content += p.renderPRDDocument(feature) + "\n"
-	
+
 	return content
 }
 
@@ -1955,12 +1915,12 @@ func (p *Prompt) syncFeatureInputs(feature *mcpclient.Feature) {
 	if feature == nil {
 		return
 	}
-	
+
 	// Sync name if the input is empty or if this is a different feature
 	if p.featureNameEdit.Value() == "" || p.featureNameEdit.Value() != feature.Name {
 		p.featureNameEdit.SetValue(feature.Name)
 	}
-	
+
 	// Sync description if the input is empty or if this is a different feature
 	if p.featureDescriptionEdit.Value() == "" || p.featureDescriptionEdit.Value() != feature.Description {
 		p.featureDescriptionEdit.SetValue(feature.Description)
@@ -1973,10 +1933,10 @@ func (p *Prompt) saveFeatureChanges() (*Prompt, tea.Cmd) {
 		p.StatusBar = "Cannot save: no feature selected or MCP unavailable"
 		return p, nil
 	}
-	
+
 	newName := strings.TrimSpace(p.featureNameEdit.Value())
 	newDescription := strings.TrimSpace(p.featureDescriptionEdit.Value())
-	
+
 	// Validate inputs
 	if newName == "" {
 		p.StatusBar = "Feature name cannot be empty"
@@ -1986,13 +1946,13 @@ func (p *Prompt) saveFeatureChanges() (*Prompt, tea.Cmd) {
 		p.StatusBar = "Feature description must be at least 10 characters"
 		return p, nil
 	}
-	
+
 	// Check if anything actually changed
 	if newName == p.SelectedFeature.Name && newDescription == p.SelectedFeature.Description {
 		p.StatusBar = "No changes to save"
 		return p, nil
 	}
-	
+
 	// Update the feature via MCP
 	go func() {
 		updates := map[string]interface{}{}
@@ -2002,14 +1962,14 @@ func (p *Prompt) saveFeatureChanges() (*Prompt, tea.Cmd) {
 		if newDescription != p.SelectedFeature.Description {
 			updates["description"] = newDescription
 		}
-		
+
 		// Note: This would need the updateFeature MCP tool, but we're using the existing structure
 		// For now, just update the local feature object
 		p.SelectedFeature.Name = newName
 		p.SelectedFeature.Description = newDescription
 		p.StatusBar = fmt.Sprintf("Feature updated: %s", newName)
 	}()
-	
+
 	return p, nil
 }
 
@@ -2018,17 +1978,17 @@ func (p *Prompt) renderPRDDocument(feature *mcpclient.Feature) string {
 	if feature == nil || p.MCP == nil {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("No feature selected") + "\n"
 	}
-	
+
 	// Try to get the PRD document
 	prdContent, err := p.MCP.GetFeatureDocumentViaStdio(feature.ID)
 	if err != nil {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("Error loading PRD: " + err.Error()) + "\n"
+		return lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render("Error loading PRD: "+err.Error()) + "\n"
 	}
-	
+
 	if prdContent == "" {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color("245")).Render("No PRD document available") + "\n"
 	}
-	
+
 	// Calculate content width
 	width := p.WindowWidth
 	if width < 80 {
@@ -2042,14 +2002,14 @@ func (p *Prompt) renderPRDDocument(feature *mcpclient.Feature) string {
 	if contentWidth < 40 {
 		contentWidth = 40
 	}
-	
+
 	// Create border style
 	borderStyle := lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
 		BorderForeground(lipgloss.Color("240")).
 		Padding(1).
 		Width(contentWidth)
-	
+
 	// Add scroll indicator and edit hint
 	scrollHint := ""
 	if p.focusState == 1 { // Feature spec view focused
@@ -2057,10 +2017,9 @@ func (p *Prompt) renderPRDDocument(feature *mcpclient.Feature) string {
 			Foreground(lipgloss.Color("245")).
 			Render("(Press 'e' to edit PRD, ↑↓ to scroll)")
 	}
-	
+
 	return borderStyle.Render(prdContent) + "\n" + scrollHint + "\n"
 }
-
 
 // startPRDEdit starts editing the PRD document (external editor or inline)
 func (p *Prompt) startPRDEdit() (*Prompt, tea.Cmd) {
@@ -2072,14 +2031,14 @@ func (p *Prompt) startPRDEdit() (*Prompt, tea.Cmd) {
 		p.StatusBar = "MCP client not available"
 		return p, nil
 	}
-	
+
 	// Get the current PRD content
 	prdContent, err := p.MCP.GetFeatureDocumentViaStdio(p.SelectedFeature.ID)
 	if err != nil {
 		p.StatusBar = fmt.Sprintf("Error getting PRD: %v", err)
 		return p, nil
 	}
-	
+
 	// Check if $EDITOR is set
 	editor := os.Getenv("EDITOR")
 	if editor != "" {
@@ -2099,7 +2058,7 @@ func (p *Prompt) startExternalPRDEdit(prdContent string) (*Prompt, tea.Cmd) {
 		p.StatusBar = fmt.Sprintf("Error creating temp file: %v", err)
 		return p, nil
 	}
-	
+
 	// Write current content to temp file
 	if _, err := tmpFile.WriteString(prdContent); err != nil {
 		tmpFile.Close()
@@ -2108,22 +2067,22 @@ func (p *Prompt) startExternalPRDEdit(prdContent string) (*Prompt, tea.Cmd) {
 		return p, nil
 	}
 	tmpFile.Close()
-	
+
 	// Get editor from environment
 	editor := os.Getenv("EDITOR")
 	p.StatusBar = fmt.Sprintf("Opening %s...", editor)
-	
+
 	// Return a command that will open the editor
 	return p, tea.ExecProcess(exec.Command(editor, tmpFile.Name()), func(err error) tea.Msg {
 		defer os.Remove(tmpFile.Name())
-		
+
 		if err != nil {
 			return PRDEditResultMsg{
 				Success: false,
 				Error:   fmt.Sprintf("Editor error: %v", err),
 			}
 		}
-		
+
 		// Read the edited content
 		editedContent, err := os.ReadFile(tmpFile.Name())
 		if err != nil {
@@ -2132,7 +2091,7 @@ func (p *Prompt) startExternalPRDEdit(prdContent string) (*Prompt, tea.Cmd) {
 				Error:   fmt.Sprintf("Error reading edited file: %v", err),
 			}
 		}
-		
+
 		return PRDEditResultMsg{
 			Success: true,
 			Content: string(editedContent),
@@ -2148,7 +2107,7 @@ func (p *Prompt) startInlinePRDEdit(prdContent string) (*Prompt, tea.Cmd) {
 	p.prdEditTextarea.SetValue(prdContent)
 	p.prdEditTextarea.Focus()
 	p.StatusBar = "Editing PRD inline - Press Ctrl+S (or Cmd+S) to save, Esc to cancel"
-	
+
 	return p, nil
 }
 
@@ -2158,4 +2117,3 @@ type PRDEditResultMsg struct {
 	Content string
 	Error   string
 }
-

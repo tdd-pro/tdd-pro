@@ -1,25 +1,19 @@
 {
-  "name": "tdd-pro-agents",
-  "version": "1.0.0",
+  "name": "@tdd-pro/mcp-server",
+  "version": "0.1.0",
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
-    "dev": "mastra dev",
-    "dev:mcp": "mastra dev --port 4111",
-    "build": "mastra build",
-    "start": "mastra start",
-    "mcp": "bun mcp-stdio-server.ts",
-    "server": "bun src/mastra/server.ts",
-    "server:watch": "bunx tsx watch src/mastra/server.ts",
-    "coverage": "vitest run --coverage"
+    "build": "bun build --compile --outfile=bin/tdd-pro-mcp ./mcp-stdio-server.ts",
+    "prepublishOnly": "bun run build"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "description": "",
+  "author": "Christian Toivola <c.toivola@dev360.com>",
+  "license": "MIT",
+  "description": "TDD-Pro MCP Server for Claude/Code/AI tools",
   "type": "module",
   "engines": {
-    "node": ">=20.9.0"
+    "bun": ">=1.0.0"
   },
   "dependencies": {
     "@ai-sdk/anthropic": "^1.2.12",
@@ -42,5 +36,11 @@
     "memfs": "^4.17.2",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"
-  }
+  },
+  "bin": {
+    "tdd-pro-mcp": "./bin/tdd-pro-mcp"
+  },
+  "files": [
+    "bin/"
+  ]
 }
