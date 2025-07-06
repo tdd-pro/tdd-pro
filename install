@@ -150,8 +150,10 @@ detect_platform() {
 download_binary() {
     local temp_dir binary_filename download_url
     
-    # Construct binary filename based on the naming convention from PRD
-    binary_filename="${BINARY_NAME}-${RELEASE_TAG}-${DETECTED_OS}-${DETECTED_ARCH}.tar.gz"
+    # Construct binary filename based on the actual GoReleaser naming convention
+    # Remove 'v' prefix from release tag for filename
+    local version_number="${RELEASE_TAG#v}"
+    binary_filename="${BINARY_NAME}-${version_number}-${DETECTED_OS}-${DETECTED_ARCH}.tar.gz"
     download_url="${DOWNLOAD_BASE}/${binary_filename}"
     
     log_info "Downloading binary: $binary_filename"
