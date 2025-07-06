@@ -5,7 +5,7 @@ project_name: tdd-pro
 before:
   hooks:
     # Build Node.js components first
-    - cd packages/tdd-pro && npm ci && npm run build
+    - sh -c "cd packages/tdd-pro && npm ci && npm run build"
 
 builds:
   - id: tui
