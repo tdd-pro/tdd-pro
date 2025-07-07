@@ -85,6 +85,7 @@ jobs:
           echo "Users can run: curl -fsSL https://raw.githubusercontent.com/tdd-pro/tdd-pro/main/install | bash"
 
       - name: Set package.json version from tag
+        working-directory: packages/tdd-pro
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           VERSION=${TAG#v}
