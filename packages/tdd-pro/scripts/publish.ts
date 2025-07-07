@@ -17,7 +17,7 @@ await $`rm -rf dist`;
 await $`mkdir -p dist/bin`;
 
 // Build the MCP server binary
-await $`bun build --compile --outfile=dist/bin/tdd-pro-mcp ../mcp-stdio-server.ts`;
+await $`bun build --compile --outfile=dist/bin/tdd-pro-mcp ./mcp-stdio-server.ts`;
 
 // Copy package.json and update version
 const packageJson = {
