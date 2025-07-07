@@ -99,7 +99,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: packages/mcp-server
+        working-directory: packages/tdd-pro
     steps:
       - uses: actions/checkout@v3
 
