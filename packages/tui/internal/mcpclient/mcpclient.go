@@ -139,7 +139,24 @@ type FeaturesData struct {
 
 // GetMCPServerPath discovers the path to the MCP stdio server.
 func GetMCPServerPath() (string, error) {
-	// 1. Check TDDPRO_PATH env var
+	// 1. Check TDDPRO_MCP_PATH env var (direct path to binary - for development)
+	mcpPath := os.Getenv("TDDPRO_MCP_PATH")
+	if mcpPath != "" {
+		if _, err := os.Stat(mcpPath); err == nil {
+			return mcpPath, nil
+		}
+	}
+	
+	// 2. Check for installed binary in ~/.tdd-pro/bin (production install)
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		binaryPath := filepath.Join(homeDir, ".tdd-pro", "bin", "tdd-pro-mcp")
+		if _, err := os.Stat(binaryPath); err == nil {
+			return binaryPath, nil
+		}
+	}
+	
+	// 3. Check TDDPRO_PATH env var (for development)
 	tddproPath := os.Getenv("TDDPRO_PATH")
 	if tddproPath != "" {
 		candidate := filepath.Join(tddproPath, "packages", "tdd-pro", "mcp-stdio-server.ts")
@@ -147,7 +164,8 @@ func GetMCPServerPath() (string, error) {
 			return candidate, nil
 		}
 	}
-	// 2. Fallback: search upward from executable for tdd-pro root
+	
+	// 4. Fallback: search upward from executable for tdd-pro root
 	exePath, err := os.Executable()
 	if err != nil {
 		return "", fmt.Errorf("could not determine executable path: %w", err)
@@ -160,7 +178,8 @@ func GetMCPServerPath() (string, error) {
 		}
 		dir = filepath.Dir(dir)
 	}
-	return "", fmt.Errorf("Could not find mcp-stdio-server.ts. Set TDDPRO_PATH or check your installation.")
+	
+	return "", fmt.Errorf("Could not find MCP server. Install via 'curl -fsSL https://raw.githubusercontent.com/tdd-pro/tdd-pro/main/install | bash' or set TDDPRO_MCP_PATH for development.")
 }
 
 // ListFeaturesViaStdio uses the mcp-golang client to call the list-features tool via stdio transport

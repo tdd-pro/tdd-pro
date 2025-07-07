@@ -580,6 +580,52 @@ For more information, visit: https://github.com/tdd-pro/tdd-pro
 EOF
 }
 
+# Install MCP server from npm
+install_mcp_server() {
+    log_info "Installing TDD-Pro MCP server..."
+    
+    # Check if npm is available
+    if ! command -v npm >/dev/null 2>&1; then
+        log_warn "npm not found - skipping MCP server installation"
+        log_warn "You can install it later with: npm install -g @tdd-pro/mcp-server"
+        return 0
+    fi
+    
+    # Create a temporary directory for npm installation
+    local temp_npm_dir="$TEMP_DIR/npm-install"
+    mkdir -p "$temp_npm_dir"
+    
+    # Install the npm package to extract the binary
+    log_info "Downloading @tdd-pro/mcp-server from npm registry..."
+    if ! (cd "$temp_npm_dir" && npm pack @tdd-pro/mcp-server); then
+        log_warn "Failed to download MCP server from npm"
+        log_warn "You can install it later with: npm install -g @tdd-pro/mcp-server"
+        return 0
+    fi
+    
+    # Extract the package
+    local package_file
+    package_file=$(find "$temp_npm_dir" -name "*.tgz" | head -1)
+    if [[ -z "$package_file" ]]; then
+        log_warn "Could not find downloaded package"
+        return 0
+    fi
+    
+    log_info "Extracting MCP server binary..."
+    tar -xzf "$package_file" -C "$temp_npm_dir"
+    
+    # Find and copy the binary
+    local mcp_binary="$temp_npm_dir/package/bin/tdd-pro-mcp"
+    if [[ -f "$mcp_binary" ]]; then
+        cp "$mcp_binary" "$INSTALL_DIR/tdd-pro-mcp"
+        chmod 755 "$INSTALL_DIR/tdd-pro-mcp"
+        log_info "✅ MCP server installed: $INSTALL_DIR/tdd-pro-mcp"
+    else
+        log_warn "Could not find MCP server binary in package"
+        log_warn "Expected: $mcp_binary"
+    fi
+}
+
 # Add install dir to PATH if not present
 add_to_path() {
     local path_entry="export PATH=\"$INSTALL_DIR:\$PATH\""
@@ -623,8 +669,12 @@ show_post_install_instructions() {
     log_info ""
     log_info "📋 Next steps:"
     log_info "  1. Verify installation: $BINARY_NAME --version"
-    log_info "  2. Get help:           $BINARY_NAME --help"
+    log_info "  2. Get help:           $BINARY_NAME --help"  
     log_info "  3. Initialize project: cd your-project && $BINARY_NAME init"
+    log_info ""
+    log_info "🔧 Development setup:"
+    log_info "  For local development, set: export TDDPRO_MCP_PATH=/path/to/your/mcp-server"
+    log_info "  The TUI will automatically find the installed MCP server for normal use"
     log_info ""
     log_info "📖 Documentation: https://github.com/tdd-pro/tdd-pro/blob/main/README.md"
     log_info "🐛 Issues:        https://github.com/tdd-pro/tdd-pro/issues"
@@ -697,6 +747,12 @@ main() {
     install_binary
     log_info "✅ Task 5 completed: Binary installed successfully"
     log_info ""
+    
+    # Task 5b: Install MCP server
+    install_mcp_server  
+    log_info "✅ Task 5b completed: MCP server installation attempted"
+    log_info ""
+    
     # Add to PATH if needed
     add_to_path
     # Task 6: Verify installation
