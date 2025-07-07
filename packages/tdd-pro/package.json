@@ -4,8 +4,7 @@
   "main": "index.js",
   "scripts": {
     "test": "vitest run",
-    "build": "bun build --compile --outfile=bin/tdd-pro-mcp ./mcp-stdio-server.ts",
-    "prepublishOnly": "bun run build"
+    "build": "bun build --compile --outfile=bin/tdd-pro-mcp ./mcp-stdio-server.ts"
   },
   "keywords": [],
   "author": "Christian Toivola <c.toivola@dev360.com>",
