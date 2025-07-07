@@ -14,19 +14,24 @@ func GetConfigDir() string {
 	return filepath.Join(home, ".tdd-pro")
 }
 
-// FindTddProDirectory traverses up from startDir, skipping ~/.tdd-pro unless no other is found.
-// Returns the path to the .tdd-pro directory, or "" if not found.
-func FindTddProDirectory(startDir string) string {
-	homeConfig := GetConfigDir()
-	var foundHome string
-	dir := startDir
+// StatFunc is a function type for file stat operations.
+type StatFunc func(name string) (os.FileInfo, error)
+
+// FindTddProDirectory traverses up from start, skipping $HOME/.tdd-pro unless no other is found.
+// Accepts a stat function for testability.
+func FindTddProDirectory(start string, stat StatFunc) string {
+	home, _ := os.UserHomeDir()
+	homeTddPro := filepath.Join(home, ".tdd-pro")
+	dir := start
+	var found string
+
 	for {
-		tddProPath := filepath.Join(dir, ".tdd-pro")
-		if stat, err := os.Stat(tddProPath); err == nil && stat.IsDir() {
-			if filepath.Clean(tddProPath) == filepath.Clean(homeConfig) {
-				foundHome = tddProPath
+		candidate := filepath.Join(dir, ".tdd-pro")
+		if _, err := stat(candidate); err == nil {
+			if candidate != homeTddPro {
+				return candidate // Prefer project-local .tdd-pro
 			} else {
-				return tddProPath
+				found = candidate // Save $HOME/.tdd-pro in case nothing else is found
 			}
 		}
 		parent := filepath.Dir(dir)
@@ -35,13 +40,16 @@ func FindTddProDirectory(startDir string) string {
 		}
 		dir = parent
 	}
-	if foundHome != "" {
-		return foundHome
-	}
-	return ""
+	// Only return $HOME/.tdd-pro if nothing else was found
+	return found
+}
+
+// FindTddProDirectoryDefault uses the real file system.
+func FindTddProDirectoryDefault(start string) string {
+	return FindTddProDirectory(start, os.Stat)
 }
 
 // IsAlreadyInitialized returns true if a project-local .tdd-pro exists (not just ~/.tdd-pro)
 func IsAlreadyInitialized(startDir string) bool {
-	return FindTddProDirectory(startDir) != ""
+	return FindTddProDirectory(startDir, os.Stat) != ""
 }

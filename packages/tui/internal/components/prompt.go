@@ -295,7 +295,7 @@ func handleDestroy(p *Prompt, arg string) (*Prompt, tea.Cmd) {
 	}
 
 	// Find the .tdd-pro directory (check current and parent directories)
-	tddProDir := util.FindTddProDirectory(cwd)
+	tddProDir := util.FindTddProDirectory(cwd, os.Stat)
 	if tddProDir == "" {
 		p.StatusBar = "No TDD-Pro project found in current or parent directories"
 		p.textInput.SetValue("")
