@@ -46,8 +46,8 @@ show_banner() {
                                         └─┘              
                                 
 ╔══════════════════════════════════════════════════════════════════════════════╗
-║                           TDD-Pro Development                                ║
-║                      Build and Install Script                               ║
+║                             TDD-Pro Development                              ║
+║                          Build and Install Script                            ║
 ╚══════════════════════════════════════════════════════════════════════════════╝
 
 EOF
