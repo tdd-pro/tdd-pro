@@ -16,30 +16,19 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Fetch all tags
-        run: git fetch --force --tags
+      - run: git fetch --force --tags
 
-      - name: Set up Go
-        uses: actions/setup-go@v5
+      - uses: actions/setup-go@v5
         with:
           go-version: ">=1.21"
           cache: true
           cache-dependency-path: packages/tui/go.sum
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: packages/tdd-pro/package-lock.json
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v2
+      - uses: oven-sh/setup-bun@v2
         with:
           bun-version: latest
 
@@ -47,26 +36,28 @@ jobs:
         run: cd packages/tui && go mod download
 
       - name: Install Node.js dependencies
-        run: cd packages/tdd-pro && npm ci
-
-      - name: Build Node.js components
-        run: cd packages/tdd-pro && npm run build
+        run: cd packages/tdd-pro && bun install
 
       - name: Run tests
         run: |
-          cd packages/tdd-pro && npm test
+          cd packages/tdd-pro && bun test
           cd ../tui && go test ./...
 
-      # NPM Publishing (Optional - requires NPM_TOKEN secret)
-      # Uncomment this section if you want to publish to npm registry
-      # - name: Publish NPM packages
-      #   if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
-      #   run: |
-      #     cd packages/tdd-pro
-      #     echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
-      #     npm publish --access public
-      #   env:
-      #     NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      - name: Publish
+        run: |
+          if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
+            TAG=${GITHUB_REF#refs/tags/}
+            VERSION=${TAG#v}
+            echo "Publishing version: $VERSION"
+            VERSION=$VERSION ./scripts/publish.ts
+          else
+            echo "Running snapshot build..."
+            ./scripts/publish.ts --dry
+          fi
+        working-directory: ./packages/tdd-pro
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Release with GoReleaser
         uses: goreleaser/goreleaser-action@v6
@@ -80,56 +71,5 @@ jobs:
       - name: Update install script compatibility
         if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
         run: |
-          # The install script should now work with the new release
           echo "✅ Install script is now compatible with release ${{ github.ref_name }}"
           echo "Users can run: curl -fsSL https://raw.githubusercontent.com/tdd-pro/tdd-pro/main/install | bash"
-
-      - name: Set package.json version from tag
-        working-directory: packages/tdd-pro
-        run: |
-          TAG=${GITHUB_REF#refs/tags/}
-          VERSION=${TAG#v}
-          npm version --no-git-tag-version $VERSION
-
-      - name: Check NPM_TOKEN presence
-        run: |
-          if [ -z "$NODE_AUTH_TOKEN" ]; then
-            echo "NODE_AUTH_TOKEN is not set"
-            exit 1
-          else
-            echo "NODE_AUTH_TOKEN is set"
-          fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Configure npm auth
-        run: echo "//registry.npmjs.org/:_authToken=${NODE_AUTH_TOKEN}" > ~/.npmrc
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
-
-  build-and-publish:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: packages/tdd-pro
-    steps:
-      - uses: actions/checkout@v3
-
-      - name: Set up Bun
-        uses: oven-sh/setup-bun@v1
-
-      - name: Install dependencies
-        run: bun install
-
-      - name: Build binary
-        run: bun run build
-
-      - name: Publish to npm
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: npm publish --access public
