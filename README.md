@@ -5,11 +5,12 @@
 An intelligent terminal tool that collaborates with Claude to implement true test-driven development workflows, helping developers build better software through systematic planning, documentation, and iterative testing.
 
 ```
+ 	                                                      
                          ╭─╮    ┌─╮  ┌─╮                 
-                        ╭┘▌╰─┬──╯░├──╯░│┌────╮┌───┬────╮ 
+                        ╭┘▌├─┬──┤░├──┤░│┌────╮┌─┬─┬────╮ 
                         ╰┐█╭─┤▗╭┐░│▗╭┐░├┤▐┌╮░││▐╭─┤▗┌╮░│ 
-                         │▓╰╮│▓╰┘░│▓╰┘░├┤▓╰╯░││▓│ │▓╰╯░│ 
-                         └──╯╰────┴────┘│▓╭──╯└─┘ ╰────╯ 
+                         │▓╰╮│▓╰┘░│▓╰┘░├┤▓├╯░││▓│ │▓╰╯░│ 
+                         ╰──╯╰────┴────┘│▓╭──╯└─┘ ╰────╯ 
                                         └─┘              
 ```
 

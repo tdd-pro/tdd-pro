@@ -48,6 +48,9 @@ function zodToJsonSchema(zodSchema: any): any {
     } else if (field._def.typeName === 'ZodEnum') {
       properties[key] = { type: 'string', enum: field._def.values, description: field.description || '' };
       if (!field.isOptional()) required.push(key);
+    } else if (field._def.typeName === 'ZodArray') {
+      properties[key] = { type: 'array', items: {}, description: field.description || '' };
+      if (!field.isOptional()) required.push(key);
     } else if (field._def.typeName === 'ZodObject') {
       properties[key] = zodToJsonSchema(field);
       if (!field.isOptional()) required.push(key);
@@ -55,6 +58,8 @@ function zodToJsonSchema(zodSchema: any): any {
       const innerType = field._def.innerType;
       if (innerType._def.typeName === 'ZodString') {
         properties[key] = { type: 'string', description: innerType.description || '' };
+      } else if (innerType._def.typeName === 'ZodArray') {
+        properties[key] = { type: 'array', items: {}, description: innerType.description || '' };
       } else if (innerType._def.typeName === 'ZodObject') {
         properties[key] = zodToJsonSchema(innerType);
       }
