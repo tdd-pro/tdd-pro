@@ -90,6 +90,17 @@ jobs:
           VERSION=${TAG#v}
           npm version --no-git-tag-version $VERSION
 
+      - name: Check NPM_TOKEN presence
+        run: |
+          if [ -z "$NODE_AUTH_TOKEN" ]; then
+            echo "NODE_AUTH_TOKEN is not set"
+            exit 1
+          else
+            echo "NODE_AUTH_TOKEN is set"
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
       - name: Publish to npm
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
