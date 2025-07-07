@@ -41,23 +41,6 @@ function zodToJsonSchema(zodSchema: any): any {
   };
 }
 
-test("MCP server schema conversion handles refine-feature-tasks correctly", () => {
-  // Test the actual schema used by refine-feature-tasks
-  const schema = z.object({
-    cwd: z.string().describe("Current working directory"),
-    featureId: z.string().describe("Feature ID (kebab-case)"),
-    tasks: z.array(z.any()).describe("List of task objects, each with id, name, status, description, and acceptance_criteria."),
-  });
-
-  const result = zodToJsonSchema(schema);
-  
-  expect(result.properties.tasks).toEqual({
-    type: 'array',
-    items: {},
-    description: 'List of task objects, each with id, name, status, description, and acceptance_criteria.'
-  });
-  expect(result.required).toContain('tasks');
-});
 
 test("MCP server schema conversion handles set-tasks correctly", () => {
   // Test the actual schema used by set-tasks

@@ -229,32 +229,6 @@ test("refineFeature updates the prd.md for a feature", async () => {
   expect(result.success).toBe(true);
 });
 
-test("refineFeatureTasks updates the tasks.yml for a feature", async () => {
-  vol.fromJSON({
-    "/project/.tdd-pro/features/tui-service-mvp/tasks.yml": yaml.dump([])
-  });
-  const tasks = [
-    {
-      id: "task-1",
-      name: "Task 1",
-      status: "pending",
-      description: "Do something important.",
-      acceptance_criteria: ["File exists"],
-    },
-    {
-      id: "task-2",
-      name: "Task 2",
-      status: "pending",
-      description: "Do something else.",
-      acceptance_criteria: ["Tests pass"],
-    }
-  ];
-  const result = await features.refineFeatureTasks("/project", "tui-service-mvp", tasks, memfs.promises);
-  const tasksContent = yaml.load(await memfs.promises.readFile("/project/.tdd-pro/features/tui-service-mvp/tasks.yml", "utf8"));
-  expect(tasksContent).toHaveLength(2);
-  expect(tasksContent[0].id).toBe("task-1");
-  expect(result.success).toBe(true);
-});
 
 test("getFeatureDocument returns existing PRD content", async () => {
   const prdContent = `# User Authentication

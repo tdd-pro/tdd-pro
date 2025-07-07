@@ -15,7 +15,7 @@ TDD-Pro supports two main agent personas:
 
 ### 1. Planner/Refiner
 - Focus: Iterates on feature requirements (PRD) and breaks down work into tasks.
-- Tools: `refine-feature`, `refine-feature-tasks`, `promote-feature`, `update-feature` (for PRD/requirements only).
+- Tools: `refine-feature`, `set-tasks`, `promote-feature`, `update-feature` (for PRD/requirements only).
 - Best Practice: Do **not** mark tasks as complete or update task status—leave this for the implementation developer.
 
 ### 2. Implementation Developer
@@ -34,7 +34,7 @@ TDD-Pro supports two main agent personas:
    - Feature Brief
    - Acceptance Criteria
    - Design Discussion (with file tree and key design ideas)
-4. **Refine Feature Tasks**: Use `refine-feature-tasks` to break down the feature into actionable tasks, each with evaluation criteria.
+4. **Refine Feature Tasks**: Use `set-tasks` to break down the feature into actionable tasks, each with evaluation criteria.
 5. **Promote Feature**: As a feature matures, use `promote-feature` to move it from refinement → planned → approved.
 6. **Update Feature**: Use `update-feature` to change a feature's name, description, or PRD/requirements. **Do not use this to mark tasks complete.**
 7. **Task Management**: Use the task tools (`get-task`, `update-task`, `set-tasks`, etc.) to update task status, mark tasks complete, or edit task details during implementation.
@@ -44,7 +44,7 @@ TDD-Pro supports two main agent personas:
 - `list-features`: See all features by status.
 - `get-feature`: Get full details for a feature (metadata, requirements, tasks).
 - `refine-feature`: Update the requirements/design markdown for a feature.
-- `refine-feature-tasks`: Update the list of tasks for a feature.
+- `set-tasks`: Update the list of tasks for a feature.
 - `promote-feature`: Move a feature through the workflow stages.
 - `update-feature`: Edit feature metadata or PRD/requirements (not for task status).
 - `get-task`, `update-task`, `set-tasks`, `create-task`, `delete-task`, `move-task`: Manage and update tasks, including marking them complete.
@@ -64,7 +64,7 @@ TDD-Pro supports two main agent personas:
 1. Use `list-features` to find a feature in refinement.
 2. Use `get-feature` to read its requirements and tasks.
 3. Use `refine-feature` to update the requirements/design.
-4. Use `refine-feature-tasks` to specify the next set of tasks.
+4. Use `set-tasks` to specify the next set of tasks.
 5. Use `promote-feature` to move the feature to planned/approved when ready.
 6. As Implementation Developer, use task tools to implement and mark tasks complete.
 

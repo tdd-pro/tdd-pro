@@ -497,21 +497,6 @@ export async function refineFeature(cwd: string, featureId: string, markdown: st
   return { success: true };
 }
 
-/**
- * Update the tasks.yml for a feature with a list of tasks (with evaluation criteria).
- * @param cwd Project root or subdirectory
- * @param featureId Feature ID (kebab-case)
- * @param tasks Array of task objects
- * @param fsMod Optional fs/promises module for testing
- */
-export async function refineFeatureTasks(cwd: string, featureId: string, tasks: any[], fsMod: any = fs) {
-  const rootResult = await findTddProRoot(cwd, fsMod);
-  if (!rootResult.success) throw new Error(rootResult.error);
-  const tasksPath = path.join(rootResult.root, ".tdd-pro", "features", featureId, "tasks.yml");
-  await fsMod.mkdir(path.dirname(tasksPath), { recursive: true });
-  await fsMod.writeFile(tasksPath, yaml.dump(tasks), "utf8");
-  return { success: true };
-}
 
 /**
  * Archive a feature: move its folder to .tdd-pro/archived-features and remove from index.

@@ -185,23 +185,6 @@ export const refineFeature = createTool({
   },
 });
 
-// Refine Feature Tasks Tool
-export const refineFeatureTasks = createTool({
-  id: "refine-feature-tasks",
-  description: "For Planner/Refiner persona: Update the list of tasks (tasks.yml) for a feature. Use this tool to specify or update the breakdown of work required to complete a feature, including evaluation criteria for each task. This enables TDD workflows and clear progress tracking.",
-  inputSchema: z.object({
-    cwd: z.string().describe("Current working directory"),
-    featureId: z.string().describe("Feature ID (kebab-case)"),
-    tasks: z.array(z.any()).describe("List of task objects, each with id, name, status, description, and acceptance_criteria."),
-  }),
-  outputSchema: z.object({
-    success: z.boolean(),
-  }),
-  execute: async ({ context }) => {
-    const { refineFeatureTasks } = await import("../lib/features");
-    return await refineFeatureTasks(context.cwd, context.featureId, context.tasks);
-  },
-});
 
 // TDD-Pro How It Works Tool
 export const tddProHowItWorks = createTool({
@@ -366,7 +349,6 @@ export const featureTools = {
   deleteFeature,
   getFeature,
   refineFeature,
-  refineFeatureTasks,
   tddProHowItWorks,
   archiveFeature,
   getFeatureDocument,
