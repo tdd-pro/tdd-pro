@@ -229,8 +229,11 @@ func (d *MCPConfigDialog) createMCPConfigFile(filePath string) error {
 		return fmt.Errorf("failed to create directory %s: %w", dir, err)
 	}
 	
-	// Create MCP server configuration pointing to the current project
-	serverPath := filepath.Join(d.projectPath, "packages", "tdd-pro", "mcp-stdio-server.ts")
+	// Find the MCP server binary in the same directory as the TUI executable
+	serverPath, err := d.findMCPServerPath()
+	if err != nil {
+		return fmt.Errorf("failed to find MCP server: %w", err)
+	}
 	
 	config := MCPConfig{
 		MCPServers: map[string]MCPServer{
@@ -268,4 +271,34 @@ func (d *MCPConfigDialog) createMCPConfigFile(filePath string) error {
 	}
 	
 	return nil
+}
+
+// findMCPServerPath finds the tdd-pro-mcp binary in the same directory as the current executable
+func (d *MCPConfigDialog) findMCPServerPath() (string, error) {
+	// Get the path of the current executable
+	exePath, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("could not determine executable path: %w", err)
+	}
+	
+	// Get the directory containing the executable
+	exeDir := filepath.Dir(exePath)
+	
+	// Look for tdd-pro-mcp in the same directory
+	mcpPath := filepath.Join(exeDir, "tdd-pro-mcp")
+	if _, err := os.Stat(mcpPath); err == nil {
+		return mcpPath, nil
+	}
+	
+	// Fallback: check if we're in development mode
+	// Look for the binary in ~/.tdd-pro/bin
+	homeDir, err := os.UserHomeDir()
+	if err == nil {
+		devMcpPath := filepath.Join(homeDir, ".tdd-pro", "bin", "tdd-pro-mcp")
+		if _, err := os.Stat(devMcpPath); err == nil {
+			return devMcpPath, nil
+		}
+	}
+	
+	return "", fmt.Errorf("could not find tdd-pro-mcp binary. Expected in same directory as tdd-pro executable: %s", exeDir)
 }

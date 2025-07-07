@@ -70,43 +70,66 @@ func (f *fakeFileInfo) IsDir() bool        { return true }
 func (f *fakeFileInfo) Sys() interface{}   { return nil }
 
 func TestIsAlreadyInitialized(t *testing.T) {
-	// Use the same fakeFS/stat approach
-	type fakeFS map[string]bool
-	stat := func(fs fakeFS) StatFunc {
-		return func(name string) (os.FileInfo, error) {
-			if fs[name] {
-				return &fakeFileInfo{name: name}, nil
-			}
-			return nil, os.ErrNotExist
-		}
-	}
-
+	// Mock the home directory for testing
+	originalHome := os.Getenv("HOME")
 	tempHome := "/home/testuser"
+	os.Setenv("HOME", tempHome)
+	defer os.Setenv("HOME", originalHome)
+
 	homeTddPro := filepath.Join(tempHome, ".tdd-pro")
 	proj := filepath.Join(tempHome, "project")
 	projTddPro := filepath.Join(proj, ".tdd-pro")
 	other := filepath.Join(tempHome, "other")
 
-	// Only ~/.tdd-pro exists
-	fs1 := fakeFS{homeTddPro: true}
-	if !IsAlreadyInitializedWithStat(filepath.Join(tempHome, "foo"), stat(fs1)) {
-		t.Error("IsAlreadyInitialized (only home) = false, want true")
+	// Only ~/.tdd-pro exists - should return false (ignore home .tdd-pro)
+	if IsAlreadyInitializedWithStat(filepath.Join(tempHome, "foo"), func(name string) (os.FileInfo, error) {
+		if name == homeTddPro {
+			return &fakeFileInfo{name: name}, nil
+		}
+		return nil, os.ErrNotExist
+	}) {
+		t.Error("IsAlreadyInitialized (only home) = true, want false (should ignore ~/.tdd-pro)")
 	}
 
-	// Project-local .tdd-pro exists
-	fs2 := fakeFS{homeTddPro: true, projTddPro: true}
-	if !IsAlreadyInitializedWithStat(filepath.Join(proj, "subdir"), stat(fs2)) {
+	// Project-local .tdd-pro exists - should return true
+	if !IsAlreadyInitializedWithStat(filepath.Join(proj, "subdir"), func(name string) (os.FileInfo, error) {
+		if name == homeTddPro || name == projTddPro {
+			return &fakeFileInfo{name: name}, nil
+		}
+		return nil, os.ErrNotExist
+	}) {
 		t.Error("IsAlreadyInitialized (project-local) = false, want true")
 	}
 
-	// No .tdd-pro exists
-	fs3 := fakeFS{}
-	if IsAlreadyInitializedWithStat(other, stat(fs3)) {
+	// No .tdd-pro exists - should return false
+	if IsAlreadyInitializedWithStat(other, func(name string) (os.FileInfo, error) {
+		return nil, os.ErrNotExist
+	}) {
 		t.Error("IsAlreadyInitialized (none) = true, want false")
 	}
 }
 
 // IsAlreadyInitializedWithStat is a test helper for injecting a stat func
 func IsAlreadyInitializedWithStat(startDir string, stat StatFunc) bool {
-	return FindTddProDirectory(startDir, stat) != ""
+	// Use our updated logic that ignores $HOME/.tdd-pro
+	home, _ := os.UserHomeDir()
+	homeTddPro := filepath.Join(home, ".tdd-pro")
+	dir := startDir
+
+	for {
+		candidate := filepath.Join(dir, ".tdd-pro")
+		if _, err := stat(candidate); err == nil {
+			// Ignore $HOME/.tdd-pro - it's just for binaries
+			if candidate != homeTddPro {
+				return true // Found a project-local .tdd-pro
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	
+	return false // No project-local .tdd-pro found
 }

@@ -49,7 +49,26 @@ func FindTddProDirectoryDefault(start string) string {
 	return FindTddProDirectory(start, os.Stat)
 }
 
-// IsAlreadyInitialized returns true if a project-local .tdd-pro exists (not just ~/.tdd-pro)
+// IsAlreadyInitialized returns true if a project-local .tdd-pro exists (ignores ~/.tdd-pro)
 func IsAlreadyInitialized(startDir string) bool {
-	return FindTddProDirectory(startDir, os.Stat) != ""
+	home, _ := os.UserHomeDir()
+	homeTddPro := filepath.Join(home, ".tdd-pro")
+	dir := startDir
+
+	for {
+		candidate := filepath.Join(dir, ".tdd-pro")
+		if _, err := os.Stat(candidate); err == nil {
+			// Ignore $HOME/.tdd-pro - it's just for binaries
+			if candidate != homeTddPro {
+				return true // Found a project-local .tdd-pro
+			}
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			break
+		}
+		dir = parent
+	}
+	
+	return false // No project-local .tdd-pro found
 }
