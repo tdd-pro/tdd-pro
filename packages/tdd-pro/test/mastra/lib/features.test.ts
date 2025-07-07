@@ -522,8 +522,7 @@ test("findTddProRoot ignores ~/.tdd-pro and finds project-local .tdd-pro (realis
   // Patch memfs.promises to add a dummy glob function for compatibility
   (memfs.promises as any).glob = async () => [];
   // Import the function directly
-  const { findTddProRoot } = require("@/lib/features");
-  const result = await findTddProRoot("/home/user/project/subdir", memfs.promises);
+  const result = await features.findTddProRoot("/home/user/project/subdir", memfs.promises);
   expect(result.success).toBe(true);
   expect(result.root).toBe("/home/user/project");
   // Restore HOME
