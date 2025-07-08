@@ -579,50 +579,266 @@ For more information, visit: https://github.com/tdd-pro/tdd-pro
 EOF
 }
 
-# Install MCP server from npm
+# Install MCP server from GitHub releases
 install_mcp_server() {
     log_info "Installing TDD-Pro MCP server..."
     
-    # Check if npm is available
-    if ! command -v npm >/dev/null 2>&1; then
-        log_warn "npm not found - skipping MCP server installation"
-        log_warn "You can install it later with: npm install -g @tdd-pro/mcp-server"
+    # Use the same release information as the main binary
+    local mcp_binary_filename mcp_download_url
+    local version_number="${RELEASE_TAG#v}"
+    
+    # Construct MCP server binary filename based on platform
+    mcp_binary_filename="tdd-pro-mcp-${version_number}-${DETECTED_OS}-${DETECTED_ARCH}.tar.gz"
+    mcp_download_url="${DOWNLOAD_BASE}/${mcp_binary_filename}"
+    
+    log_info "Downloading MCP server: $mcp_binary_filename"
+    log_info "Download URL: $mcp_download_url"
+    
+    local mcp_binary_path="$TEMP_DIR/$mcp_binary_filename"
+    
+    # Download with progress bar and retry logic
+    local max_retries=3
+    local retry_count=0
+    
+    while [[ $retry_count -lt $max_retries ]]; do
+        if curl -fL --progress-bar "$mcp_download_url" -o "$mcp_binary_path"; then
+            log_info "✅ MCP server download completed successfully"
+            break
+        else
+            retry_count=$((retry_count + 1))
+            if [[ $retry_count -lt $max_retries ]]; then
+                log_warn "MCP server download failed, retrying... (attempt $retry_count/$max_retries)"
+                sleep 2
+            else
+                log_warn "MCP server download failed after $max_retries attempts"
+                log_warn "URL: $mcp_download_url"
+                log_info "Trying to build MCP server from source..."
+                build_mcp_server_from_source
+                return $?
+            fi
+        fi
+    done
+    
+    # Verify file was downloaded and has content
+    if [[ ! -f "$mcp_binary_path" ]]; then
+        log_warn "Downloaded MCP server file not found: $mcp_binary_path"
         return 0
     fi
     
-    # Create a temporary directory for npm installation
-    local temp_npm_dir="$TEMP_DIR/npm-install"
-    mkdir -p "$temp_npm_dir"
+    local file_size
+    file_size=$(stat -f%z "$mcp_binary_path" 2>/dev/null || stat -c%s "$mcp_binary_path" 2>/dev/null || echo "0")
     
-    # Install the npm package to extract the binary
-    log_info "Downloading @tdd-pro/mcp-server from npm registry..."
-    if ! (cd "$temp_npm_dir" && npm pack @tdd-pro/mcp-server); then
-        log_warn "Failed to download MCP server from npm"
-        log_warn "You can install it later with: npm install -g @tdd-pro/mcp-server"
+    if [[ "$file_size" -eq 0 ]]; then
+        log_warn "Downloaded MCP server file is empty: $mcp_binary_path"
         return 0
     fi
     
-    # Extract the package
-    local package_file
-    package_file=$(find "$temp_npm_dir" -name "*.tgz" | head -1)
-    if [[ -z "$package_file" ]]; then
-        log_warn "Could not find downloaded package"
+    log_info "Downloaded MCP server binary size: $(( file_size / 1024 ))KB"
+    
+    # Verify MCP server checksum if available
+    verify_mcp_checksum "$mcp_binary_path" "$mcp_binary_filename"
+    
+    # Extract the MCP server binary
+    local mcp_extract_dir="$TEMP_DIR/mcp-extract"
+    mkdir -p "$mcp_extract_dir"
+    
+    if ! tar -xzf "$mcp_binary_path" -C "$mcp_extract_dir"; then
+        log_warn "Failed to extract MCP server archive: $mcp_binary_path"
         return 0
     fi
     
-    log_info "Extracting MCP server binary..."
-    tar -xzf "$package_file" -C "$temp_npm_dir"
-    
-    # Find and copy the binary
-    local mcp_binary="$temp_npm_dir/package/bin/tdd-pro-mcp"
-    if [[ -f "$mcp_binary" ]]; then
-        cp "$mcp_binary" "$INSTALL_DIR/tdd-pro-mcp"
-        chmod 755 "$INSTALL_DIR/tdd-pro-mcp"
-        log_info "✅ MCP server installed: $INSTALL_DIR/tdd-pro-mcp"
+    # Find the MCP server binary in the extracted files
+    local mcp_binary_source
+    if [[ -f "$mcp_extract_dir/tdd-pro-mcp" ]]; then
+        mcp_binary_source="$mcp_extract_dir/tdd-pro-mcp"
+    elif [[ -f "$mcp_extract_dir/bin/tdd-pro-mcp" ]]; then
+        mcp_binary_source="$mcp_extract_dir/bin/tdd-pro-mcp"
     else
-        log_warn "Could not find MCP server binary in package"
-        log_warn "Expected: $mcp_binary"
+        # Look for any executable file with mcp in the name
+        mcp_binary_source=$(find "$mcp_extract_dir" -type f -executable -name "*mcp*" | head -1)
+        if [[ -z "$mcp_binary_source" ]]; then
+            log_warn "Could not find MCP server binary in extracted archive"
+            log_warn "Archive contents:"
+            find "$mcp_extract_dir" -type f | head -10 >&2
+            return 0
+        fi
     fi
+    
+    log_info "Found MCP server binary: $mcp_binary_source"
+    
+    # Install the MCP server binary
+    local mcp_binary_target="$INSTALL_DIR/tdd-pro-mcp"
+    
+    log_info "Installing MCP server to: $mcp_binary_target"
+    
+    if ! cp "$mcp_binary_source" "$mcp_binary_target"; then
+        log_warn "Failed to copy MCP server binary to $mcp_binary_target"
+        return 0
+    fi
+    
+    if ! chmod 755 "$mcp_binary_target"; then
+        log_warn "Failed to set executable permissions on MCP server"
+        return 0
+    fi
+    
+    log_info "✅ MCP server installed successfully"
+    log_info "   Location: $mcp_binary_target"
+    log_info "   Permissions: $(ls -l "$mcp_binary_target" | cut -d' ' -f1)"
+    
+    # Test the MCP server binary
+    log_info "Testing MCP server execution..."
+    if "$mcp_binary_target" --version >/dev/null 2>&1 || "$mcp_binary_target" --help >/dev/null 2>&1; then
+        log_info "✅ MCP server binary executed successfully"
+    else
+        log_warn "⚠️  MCP server execution test failed"
+        log_warn "   This could be normal if the binary requires specific arguments"
+    fi
+}
+
+# Verify MCP server checksum if available
+verify_mcp_checksum() {
+    local mcp_binary_path="$1"
+    local mcp_binary_filename="$2"
+    
+    log_info "Verifying MCP server SHA256 checksum..."
+    
+    # Check if checksums file exists and contains MCP server checksum
+    local checksums_file="$TEMP_DIR/checksums.txt"
+    if [[ ! -f "$checksums_file" ]]; then
+        log_warn "Checksums file not available - skipping MCP server checksum verification"
+        return 0
+    fi
+    
+    # Extract expected checksum for MCP server binary
+    local expected_checksum
+    if ! expected_checksum=$(grep "$mcp_binary_filename" "$checksums_file" | cut -d' ' -f1); then
+        log_warn "No checksum found for $mcp_binary_filename - skipping verification"
+        return 0
+    fi
+    
+    if [[ -z "$expected_checksum" ]]; then
+        log_warn "Empty checksum found for $mcp_binary_filename - skipping verification"
+        return 0
+    fi
+    
+    log_info "Expected MCP server SHA256: $expected_checksum"
+    
+    # Calculate actual checksum of downloaded file
+    local actual_checksum
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual_checksum=$(sha256sum "$mcp_binary_path" | cut -d' ' -f1)
+    elif command -v shasum >/dev/null 2>&1; then
+        actual_checksum=$(shasum -a 256 "$mcp_binary_path" | cut -d' ' -f1)
+    elif command -v openssl >/dev/null 2>&1; then
+        actual_checksum=$(openssl dgst -sha256 "$mcp_binary_path" | cut -d' ' -f2)
+    else
+        log_warn "No SHA256 utility found - skipping MCP server checksum verification"
+        return 0
+    fi
+    
+    log_info "Actual MCP server SHA256:   $actual_checksum"
+    
+    # Compare checksums
+    if [[ "$expected_checksum" == "$actual_checksum" ]]; then
+        log_info "✅ MCP server checksum verification PASSED"
+    else
+        log_warn "⚠️  MCP server checksum verification FAILED"
+        log_warn "Expected: $expected_checksum"
+        log_warn "Actual:   $actual_checksum"
+        log_warn "Continuing installation - please verify MCP server manually"
+    fi
+}
+
+# Build MCP server from source when pre-built binary is not available
+build_mcp_server_from_source() {
+    log_info "Building MCP server from source..."
+    
+    # Check if required tools are available
+    if ! command -v git >/dev/null 2>&1; then
+        log_warn "git is required to build MCP server from source"
+        log_warn "Please install git or install MCP server manually"
+        return 0
+    fi
+    
+    if ! command -v bun >/dev/null 2>&1; then
+        log_warn "bun is required to build MCP server from source"
+        log_warn "Please install bun (https://bun.sh) or install MCP server manually"
+        return 0
+    fi
+    
+    # Create temporary directory for building
+    local build_dir="$TEMP_DIR/mcp-build"
+    mkdir -p "$build_dir"
+    
+    log_info "Cloning TDD-Pro repository..."
+    if ! git clone --depth=1 --branch="$RELEASE_TAG" "https://github.com/tdd-pro/tdd-pro.git" "$build_dir"; then
+        log_warn "Failed to clone repository"
+        return 0
+    fi
+    
+    # Navigate to the package directory
+    local package_dir="$build_dir/packages/tdd-pro"
+    if [[ ! -d "$package_dir" ]]; then
+        log_warn "Package directory not found: $package_dir"
+        return 0
+    fi
+    
+    cd "$package_dir"
+    
+    # Install dependencies
+    log_info "Installing dependencies..."
+    if ! bun install; then
+        log_warn "Failed to install dependencies"
+        return 0
+    fi
+    
+    # Build the MCP server
+    log_info "Building MCP server for $DETECTED_OS-$DETECTED_ARCH..."
+    if ! bash scripts/build-mcp.sh; then
+        log_warn "Failed to build MCP server"
+        return 0
+    fi
+    
+    # Find the built binary
+    local built_binary
+    built_binary="bin/${DETECTED_OS}-${DETECTED_ARCH}/tdd-pro-mcp"
+    
+    if [[ ! -f "$built_binary" ]]; then
+        log_warn "Built binary not found: $built_binary"
+        log_warn "Available binaries:"
+        ls -la bin/ 2>/dev/null || echo "No bin directory found"
+        return 0
+    fi
+    
+    # Copy the built binary to the install directory
+    local mcp_binary_target="$INSTALL_DIR/tdd-pro-mcp"
+    
+    log_info "Installing built MCP server to: $mcp_binary_target"
+    
+    if ! cp "$built_binary" "$mcp_binary_target"; then
+        log_warn "Failed to copy built MCP server binary"
+        return 0
+    fi
+    
+    if ! chmod 755 "$mcp_binary_target"; then
+        log_warn "Failed to set executable permissions on built MCP server"
+        return 0
+    fi
+    
+    log_info "✅ MCP server built and installed successfully from source"
+    log_info "   Location: $mcp_binary_target"
+    log_info "   Permissions: $(ls -l "$mcp_binary_target" | cut -d' ' -f1)"
+    
+    # Test the built MCP server binary
+    log_info "Testing built MCP server execution..."
+    if "$mcp_binary_target" --version >/dev/null 2>&1 || "$mcp_binary_target" --help >/dev/null 2>&1; then
+        log_info "✅ Built MCP server binary executed successfully"
+    else
+        log_warn "⚠️  Built MCP server execution test failed"
+        log_warn "   This could be normal if the binary requires specific arguments"
+    fi
+    
+    return 0
 }
 
 # Add install dir to PATH if not present
