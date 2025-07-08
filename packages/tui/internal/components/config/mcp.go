@@ -37,6 +37,9 @@ type MCPConfigDialog struct {
 	createMCPConfigs bool
 	createCursor     bool
 	createVSCode     bool
+	
+	// Function for finding MCP server path (can be overridden for testing)
+	findMCPServerPathFunc func() (string, error)
 }
 
 // NewMCPConfigDialog creates a new MCP configuration dialog
@@ -45,6 +48,9 @@ func NewMCPConfigDialog(projectPath string) *MCPConfigDialog {
 		projectPath: projectPath,
 		visible:     false,
 	}
+	
+	// Set default MCP server path finder
+	dialog.findMCPServerPathFunc = dialog.findMCPServerPath
 	
 	dialog.form = dialog.createForm()
 	return dialog
@@ -136,14 +142,14 @@ func (d *MCPConfigDialog) createForm() *huh.Form {
 		huh.NewGroup(
 			huh.NewConfirm().
 				Title("Create Cursor configuration?").
-				Description("Create .cursor/.mcp.json for Cursor AI editor integration.").
+				Description("Create .cursor/mcp.json for Cursor AI editor integration.").
 				Affirmative("Yes").
 				Negative("No").
 				Value(&d.createCursor),
 			
 			huh.NewConfirm().
 				Title("Create VS Code configuration?").
-				Description("Create .vscode/.mcp.json for VS Code with Cody or similar extensions.").
+				Description("Create .vscode/mcp.json for VS Code with Cody or similar extensions.").
 				Affirmative("Yes").
 				Negative("No").
 				Value(&d.createVSCode),
@@ -176,21 +182,21 @@ func (d *MCPConfigDialog) handleFormComplete() tea.Cmd {
 		
 		// Create Cursor configuration if requested
 		if d.createCursor {
-			cursorPath := filepath.Join(d.projectPath, ".cursor", ".mcp.json")
+			cursorPath := filepath.Join(d.projectPath, ".cursor", "mcp.json")
 			if err := d.createMCPConfigFile(cursorPath); err != nil {
 				errors = append(errors, fmt.Errorf("Cursor config: %w", err))
 			} else {
-				createdFiles = append(createdFiles, ".cursor/.mcp.json")
+				createdFiles = append(createdFiles, ".cursor/mcp.json")
 			}
 		}
 		
 		// Create VS Code configuration if requested
 		if d.createVSCode {
-			vscodePath := filepath.Join(d.projectPath, ".vscode", ".mcp.json")
+			vscodePath := filepath.Join(d.projectPath, ".vscode", "mcp.json")
 			if err := d.createMCPConfigFile(vscodePath); err != nil {
 				errors = append(errors, fmt.Errorf("VS Code config: %w", err))
 			} else {
-				createdFiles = append(createdFiles, ".vscode/.mcp.json")
+				createdFiles = append(createdFiles, ".vscode/mcp.json")
 			}
 		}
 		
@@ -230,7 +236,11 @@ func (d *MCPConfigDialog) createMCPConfigFile(filePath string) error {
 	}
 	
 	// Find the MCP server binary in the same directory as the TUI executable
-	serverPath, err := d.findMCPServerPath()
+	findFunc := d.findMCPServerPathFunc
+	if findFunc == nil {
+		findFunc = d.findMCPServerPath
+	}
+	serverPath, err := findFunc()
 	if err != nil {
 		return fmt.Errorf("failed to find MCP server: %w", err)
 	}
