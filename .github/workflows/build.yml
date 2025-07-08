@@ -32,13 +32,6 @@ jobs:
           cache: true
           cache-dependency-path: packages/tui/go.sum
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: packages/tdd-pro/package-lock.json
-
       - name: Set up Bun
         uses: oven-sh/setup-bun@v2
         with:
@@ -48,14 +41,17 @@ jobs:
         run: cd packages/tui && go mod download
 
       - name: Install Node.js dependencies
-        run: cd packages/tdd-pro && npm ci
+        run: cd packages/tdd-pro && bun install
 
       - name: Build Node.js components
-        run: cd packages/tdd-pro && npm run build
+        run: cd packages/tdd-pro && bun run build
+
+      - name: Build MCP server binaries
+        run: cd packages/tdd-pro && bash scripts/build-mcp.sh
 
       - name: Run tests
         run: |
-          cd packages/tdd-pro && npm test
+          cd packages/tdd-pro && bun test
           cd ../tui && go test ./...
 
       - name: Build with GoReleaser (snapshot)

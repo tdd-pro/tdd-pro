@@ -38,6 +38,9 @@ jobs:
       - name: Install Node.js dependencies
         run: cd packages/tdd-pro && bun install
 
+      - name: Build MCP server binaries
+        run: cd packages/tdd-pro && bash scripts/build-mcp.sh
+
       - name: Run tests
         run: |
           cd packages/tdd-pro && bun test
