@@ -30,6 +30,7 @@ type Prompt struct {
 	promptingForCWD  bool
 	awaitingCWDInput bool
 	cwdCandidate     string
+	version          string // Dynamic version string
 
 	// New completion system
 	completionManager *CompletionManager
@@ -111,7 +112,7 @@ func NewPrompt() Prompt {
 	}
 }
 
-func NewPromptWithAPI(apiURL string) Prompt {
+func NewPromptWithAPI(apiURL string, version string) Prompt {
 	ti := textinput.New()
 	ti.Placeholder = "Type a command or message..."
 	ti.Focus()
@@ -145,6 +146,7 @@ func NewPromptWithAPI(apiURL string) Prompt {
 		APIURL:                 apiURL,
 		MCP:                    mcp,
 		StatusBar:              "",
+		version:                version,
 		completionManager:      NewCompletionManager(),
 		completionDialog:       NewCompletionDialog(),
 		featureNameEdit:        nameEdit,
@@ -840,7 +842,11 @@ func (p *Prompt) View() string {
 	}
 	// Header
 	headerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("81")).Bold(true).Padding(0, 1)
-	header := headerStyle.Render("TDD-Pro TUI v0.1.0")
+	versionText := "TDD-Pro TUI"
+	if p.version != "" {
+		versionText += " " + p.version
+	}
+	header := headerStyle.Render(versionText)
 
 	// If PRD editing is active, show the textarea overlay
 	if p.editingPRD {

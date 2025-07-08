@@ -44,6 +44,8 @@ archives:
       - README.md
       - LICENSE
       - packages/tdd-pro/dist/**/*
+      # Include platform-specific MCP server binaries
+      - packages/tdd-pro/bin/{{ .Os }}-{{ .Arch }}/**/*
 
 checksum:
   name_template: "checksums.txt"

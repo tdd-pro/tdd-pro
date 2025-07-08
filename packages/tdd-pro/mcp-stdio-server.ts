@@ -17,11 +17,14 @@ import { taskTools } from './src/mastra/tools/task-tools.js';
 
 // Feature tools from the main application
 
+// Get version from environment (injected at build time) or fallback
+const serverVersion = process.env.TDDPRO_VERSION || 'dev';
+
 // Create MCP server
 const server = new Server(
   {
     name: 'TDD-Pro MCP Server',
-    version: '1.0.0',
+    version: serverVersion,
   },
   {
     capabilities: {
@@ -132,15 +135,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   }
 });
 
+// Debug logging helper
+const DEBUG_TDDPRO = process.env.DEBUG_TDDPRO === 'true';
+const debugLog = (...args: any[]) => {
+  if (DEBUG_TDDPRO) {
+    console.error(...args);
+  }
+};
+
 // Start stdio server
 async function main() {
   try {
-    console.error('Starting TDD-Pro MCP Server...');
+    debugLog('Starting TDD-Pro MCP Server...');
     
     const transport = new StdioServerTransport();
     await server.connect(transport);
     
-    console.error('TDD-Pro MCP Server ready for Claude Code');
+    debugLog('TDD-Pro MCP Server ready for Claude Code');
   } catch (error) {
     console.error('Failed to start MCP server:', error);
     process.exit(1);
@@ -149,12 +160,12 @@ async function main() {
 
 // Handle process cleanup
 process.on('SIGINT', () => {
-  console.error('Shutting down TDD-Pro MCP Server...');
+  debugLog('Shutting down TDD-Pro MCP Server...');
   process.exit(0);
 });
 
 process.on('SIGTERM', () => {
-  console.error('Shutting down TDD-Pro MCP Server...');
+  debugLog('Shutting down TDD-Pro MCP Server...');
   process.exit(0);
 });
 

@@ -277,7 +277,6 @@ export async function migrateFeatures(cwd: string, fsMod: any = fs) {
     if (needsMigration) {
       await fsMod.mkdir(path.dirname(indexPath), { recursive: true });
       await fsMod.writeFile(indexPath, yaml.dump(data), "utf8");
-      console.log(`Migrated features file: ${indexPath}`);
     }
     
     return data as FeaturesData;

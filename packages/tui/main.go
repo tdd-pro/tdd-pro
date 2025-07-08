@@ -8,7 +8,8 @@ import (
 	"tddpro/internal/tui"
 )
 
-const version = "v0.1.0"
+// Version is injected at build time via -ldflags "-X main.version=..."
+var version = "dev"
 
 func main() {
 	// Add --version and -v flag support
@@ -22,7 +23,7 @@ func main() {
 	}
 
 	apiURL := tui.LoadAPIURL()
-	if err := tui.Start(apiURL); err != nil {
+	if err := tui.Start(apiURL, version); err != nil {
 		fmt.Println("Error running program:", err)
 		os.Exit(1)
 	}

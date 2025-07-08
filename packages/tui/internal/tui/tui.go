@@ -9,7 +9,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-const version = "v0.1.0"
 
 var banner = `
  ╭─╮    ┌─╮  ┌─╮                 
@@ -70,8 +69,8 @@ func (m model) View() string {
 	)
 }
 
-func Start(apiURL string) error {
-	prompt := components.NewPromptWithAPI(apiURL)
+func Start(apiURL string, version string) error {
+	prompt := components.NewPromptWithAPI(apiURL, version)
 	p := tea.NewProgram(
 		model{prompt: &prompt},
 		tea.WithAltScreen(),       // Use alternate screen buffer

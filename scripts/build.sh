@@ -6,7 +6,14 @@
 set -e
 
 # Configuration
-VERSION=${VERSION:-"v1.0.0"}
+# Get version from git tags, fallback to a default if not in a git repo
+if [ -z "$VERSION" ]; then
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        VERSION=$(git describe --tags --always 2>/dev/null || echo "v0.0.0-$(git rev-parse --short HEAD)")
+    else
+        VERSION="v0.0.0-dev"
+    fi
+fi
 BINARY_NAME="tdd-pro"
 BUILD_DIR="build"
 DIST_DIR="dist"
