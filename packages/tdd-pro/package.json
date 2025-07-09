@@ -6,6 +6,7 @@
     "test": "vitest run",
     "test:evals": "vitest run test/mastra/evaluations/",
     "eval:real": "tsx src/mastra/evaluations/real-eval-runner.ts",
+    "eval:design": "tsx src/mastra/evaluations/design-eval-runner.ts",
     "eval:ci": "npm run eval:real && echo 'Real evaluations completed for CI/CD'",
     "eval:history": "node scripts/view-eval-history.js",
     "build": "./scripts/build-mcp.sh"

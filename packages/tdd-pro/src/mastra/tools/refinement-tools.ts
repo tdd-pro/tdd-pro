@@ -1,8 +1,12 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { RefinementAgent } from "../agents/refinement-agent";
+import { RefinementWorkflowManager, REFINEMENT_CRITERIA } from "../workflows/refinement-workflow";
 import path from "path";
 import os from "os";
+
+// Global workflow manager instance
+const workflowManager = new RefinementWorkflowManager();
 
 // Active agent instances (simple in-memory storage for demo)
 const activeAgents = new Map<string, RefinementAgent>();
@@ -28,47 +32,46 @@ export const startRefinementConversation = createTool({
   inputSchema: z.object({
     cwd: z.string().describe("Current working directory"),
     featureId: z.string().describe("Feature ID to refine"),
-    message: z.string().describe("Initial message to start the conversation"),
+    message: z.string().optional().describe("Initial message to start the conversation"),
     userId: z.string().optional().default("default-user").describe("User ID for conversation tracking"),
   }),
   outputSchema: z.object({
     success: z.boolean(),
     threadId: z.string().optional(),
     response: z.string().optional(),
+    phase: z.string().optional(),
+    requirements: z.any().optional(),
     error: z.string().optional(),
   }),
   execute: async ({ context }) => {
     try {
       // Validate required parameters
-      if (!context.cwd || !context.featureId || !context.message) {
+      if (!context.cwd || !context.featureId) {
         return {
           success: false,
-          error: "Missing required parameters: cwd, featureId, and message are required"
+          error: "Missing required parameters: cwd and featureId are required"
         };
       }
 
-      const agent = await getOrCreateAgent(context.cwd);
-      
-      // Use feature ID as thread ID for simpler conversation management
-      const threadId = context.featureId;
-      
-      // Store thread info
-      activeThreads.set(threadId, {
+      // Start the workflow - this will declare requirements upfront
+      const result = await workflowManager.startWorkflow(
+        context.featureId, 
+        context.userId || 'default-user'
+      );
+
+      // Store thread info for backward compatibility
+      activeThreads.set(context.featureId, {
         agentKey: context.cwd,
         featureId: context.featureId,
-        userId: context.userId
-      });
-
-      // Start conversation
-      const response = await agent.generate(context.message, {
-        threadId,
-        resourceId: context.userId || "default-user",
+        userId: context.userId || 'default-user'
       });
 
       return {
         success: true,
-        threadId,
-        response: response.text,
+        threadId: context.featureId,
+        response: result.message,
+        phase: 'entry',
+        requirements: REFINEMENT_CRITERIA,
       };
     } catch (error) {
       return {
@@ -91,6 +94,8 @@ export const continueRefinementConversation = createTool({
   outputSchema: z.object({
     success: z.boolean(),
     response: z.string().optional(),
+    phase: z.string().optional(),
+    isComplete: z.boolean().optional(),
     error: z.string().optional(),
   }),
   execute: async ({ context }) => {
@@ -110,16 +115,17 @@ export const continueRefinementConversation = createTool({
         };
       }
 
-      const agent = await getOrCreateAgent(context.cwd);
-      
-      const response = await agent.generate(context.message, {
-        threadId: context.threadId,
-        resourceId: threadInfo.userId || "default-user",
-      });
+      // Continue the workflow
+      const result = await workflowManager.continueWorkflow(
+        context.threadId,
+        context.message
+      );
 
       return {
         success: true,
-        response: response.text,
+        response: result.message,
+        phase: result.state?.phase,
+        isComplete: result.isComplete || false,
       };
     } catch (error) {
       return {
@@ -182,7 +188,8 @@ export const getRefinementStatus = createTool({
   }),
   outputSchema: z.object({
     success: z.boolean(),
-    status: z.enum(["active", "complete", "not-found"]).optional(),
+    status: z.enum(["active", "complete", "abandoned", "not-found"]).optional(),
+    phase: z.string().optional(),
     featureId: z.string().optional(),
     userId: z.string().optional(),
     error: z.string().optional(),
@@ -196,21 +203,72 @@ export const getRefinementStatus = createTool({
         };
       }
 
-      const threadInfo = activeThreads.get(context.threadId);
-      if (!threadInfo) {
+      const workflowStatus = await workflowManager.getWorkflowStatus(context.threadId);
+      
+      if (workflowStatus.status === 'not-found') {
         return {
           success: true,
           status: "not-found",
         };
       }
 
-      // For now, all active threads are considered "active"
-      // In a real implementation, you'd check conversation completion status
+      const threadInfo = activeThreads.get(context.threadId);
+      const state = workflowStatus.state;
+      
+      let status: "active" | "complete" | "abandoned" = "active";
+      if (state?.phase === 'exit') {
+        status = "complete";
+      } else if (state?.phase === 'abandoned') {
+        status = "abandoned";
+      }
+
       return {
         success: true,
-        status: "active",
-        featureId: threadInfo.featureId,
-        userId: threadInfo.userId,
+        status,
+        phase: state?.phase,
+        featureId: threadInfo?.featureId,
+        userId: threadInfo?.userId,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  },
+});
+
+// Abandon Refinement Workflow Tool
+export const abandonRefinementWorkflow = createTool({
+  id: "abandon-refinement-workflow",
+  description: "Abandon an active refinement workflow",
+  inputSchema: z.object({
+    cwd: z.string().describe("Current working directory"),
+    threadId: z.string().describe("Thread ID of the workflow to abandon"),
+    reason: z.string().optional().describe("Reason for abandonment"),
+  }),
+  outputSchema: z.object({
+    success: z.boolean(),
+    response: z.string().optional(),
+    error: z.string().optional(),
+  }),
+  execute: async ({ context }) => {
+    try {
+      if (!context.cwd || !context.threadId) {
+        return {
+          success: false,
+          error: "Missing required parameters: cwd and threadId are required"
+        };
+      }
+
+      const result = await workflowManager.abandonWorkflow(context.threadId);
+      
+      // Clean up thread info
+      activeThreads.delete(context.threadId);
+
+      return {
+        success: true,
+        response: result.message,
       };
     } catch (error) {
       return {
@@ -267,5 +325,6 @@ export const refinementTools = {
   continueRefinementConversation,
   refineFeatureConversation,
   getRefinementStatus,
+  abandonRefinementWorkflow,
   updateFeaturePRD,
 };
