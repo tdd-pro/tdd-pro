@@ -1,12 +1,13 @@
 import { evaluate, EvaluationResult } from "@mastra/core";
 import { RefinementAgent } from "../agents/refinement-agent";
 import {
-  TDDCoachingMetric,
-  SandiMetzMetric,
-  ConversationQualityMetric,
-  RedGreenRefactorMetric,
-  FeatureCompletionMetric
-} from "./tdd-metrics";
+  TDDKnowledgeMetric,
+  TestStrategyCoachingMetric,
+  ConversationManagementMetric,
+  PRDRefinementQualityMetric,
+  PersonaConsistencyMetric,
+  ConversationTerminationMetric
+} from "./prd-refinement-metrics";
 
 interface EvaluationConfig {
   cwd: string;
@@ -28,81 +29,90 @@ export async function runRefinementAgentEvaluations(config: EvaluationConfig): P
     cwd: config.cwd
   });
 
-  // Define evaluation scenarios
+  // Define evaluation scenarios focused on PRD refinement quality
   const scenarios: EvaluationScenario[] = [
-    // TDD Coaching Scenarios
+    // TDD Knowledge Application
     {
-      testName: "TDD coaching - vague feature request",
-      input: "I want to implement user authentication",
-      metric: new TDDCoachingMetric(),
-      instructions: "Evaluate how well the agent coaches TDD practices for vague requests"
+      testName: "TDD Knowledge - Kent Beck principles",
+      input: "I need to implement user authentication with email and password",
+      metric: new TDDKnowledgeMetric(),
+      instructions: "Evaluate how well the agent applies Kent Beck TDD principles to PRD refinement"
     },
     {
-      testName: "TDD coaching - implementation question", 
-      input: "How should I implement password validation?",
-      metric: new RedGreenRefactorMetric(),
-      instructions: "Evaluate red-green-refactor cycle guidance"
+      testName: "TDD Knowledge - Red-Green-Refactor guidance",
+      input: "How should I structure the tests for a shopping cart feature?",
+      metric: new TDDKnowledgeMetric(),
+      instructions: "Evaluate agent's guidance on red-green-refactor cycles for feature development"
     },
 
-    // Sandi Metz Rules Scenarios
+    // Test Strategy Coaching
     {
-      testName: "Sandi Metz violation detection",
+      testName: "Test Strategy - Framework inquiry",
+      input: "I want to build a notification system that sends emails and SMS",
+      metric: new TestStrategyCoachingMetric(),
+      instructions: "Evaluate how well the agent asks about test frameworks and infrastructure"
+    },
+    {
+      testName: "Test Strategy - Test isolation",
+      input: "The feature needs to integrate with external payment APIs",
+      metric: new TestStrategyCoachingMetric(),
+      instructions: "Evaluate agent's coaching on test isolation strategies for external dependencies"
+    },
+
+    // PRD Refinement Quality
+    {
+      testName: "PRD Refinement - Missing architectural details",
+      input: "We need a user dashboard that shows analytics data",
+      metric: new PRDRefinementQualityMetric(),
+      instructions: "Evaluate ability to identify missing architectural details in PRD"
+    },
+    {
+      testName: "PRD Refinement - Implementation specifics",
+      input: "Add real-time chat functionality to the application",
+      metric: new PRDRefinementQualityMetric(),
+      instructions: "Evaluate agent's ability to clarify implementation specifics"
+    },
+
+    // Persona Consistency
+    {
+      testName: "Persona - Senior TDD Architect authority",
+      input: "I think we should just start coding and figure it out as we go",
+      metric: new PersonaConsistencyMetric(),
+      instructions: "Evaluate agent's ability to maintain authoritative TDD expertise"
+    },
+    {
+      testName: "Persona - Challenge vague requirements",
+      input: "The system should work well and be fast",
+      metric: new PersonaConsistencyMetric(),
+      instructions: "Evaluate agent's ability to challenge vague requirements appropriately"
+    },
+
+    // Conversation Management
+    {
+      testName: "Conversation Management - Context maintenance",
+      input: "Based on what we discussed earlier about the login flow, how should we handle errors?",
+      metric: new ConversationManagementMetric(),
+      instructions: "Evaluate agent's ability to maintain context across conversation turns"
+    },
+
+    // Conversation Termination
+    {
+      testName: "Conversation Termination - Well-defined feature",
       input: `
-class UserManager {
-  authenticateUser(email: string, password: string, rememberMe: boolean, ipAddress: string, userAgent: string) {
-    // Method with too many parameters
-  }
-}`,
-      metric: new SandiMetzMetric(),
-      instructions: "Evaluate detection of Sandi Metz rule violations"
-    },
-
-    // Conversation Quality Scenarios
-    {
-      testName: "conversation quality - vague behavior",
-      input: "The system should handle user input correctly",
-      metric: new ConversationQualityMetric(),
-      instructions: "Evaluate ability to challenge vague descriptions"
-    },
-
-    // Feature Completion Recognition
-    {
-      testName: "Feature completion recognition",
-      input: `
-Feature: User Authentication
-Given a user with valid credentials
-When they log in
-Then they receive a JWT token
+Feature: User Registration
+Given a new user provides valid email and password
+When they submit the registration form
+Then they receive a verification email
+And their account is created in pending state
 
 Test Strategy:
-- Unit tests for password validation
-- Integration tests for JWT generation
-- E2E tests for complete login flow
+- Unit tests for email validation
+- Integration tests for user creation
+- E2E tests for complete registration flow
+- Mock email service for testing
 `,
-      metric: new FeatureCompletionMetric(),
-      instructions: "Evaluate recognition of well-defined features"
-    },
-
-    // Beck TDD Principles
-    {
-      testName: "Beck TDD principles guidance",
-      input: "What's the best way to start implementing this feature?",
-      metric: new TDDCoachingMetric(),
-      instructions: "Evaluate guidance on Kent Beck TDD principles"
-    },
-
-    // Complex Conversation Flow
-    {
-      testName: "conversation quality - dependency injection",
-      input: `
-I want to build a payment processor that:
-- Validates credit cards
-- Charges via Stripe
-- Sends email receipts
-- Updates user account
-`,
-      metric: new ConversationQualityMetric(),
-      instructions: "Evaluate handling of complex features with multiple dependencies"
+      metric: new ConversationTerminationMetric(),
+      instructions: "Evaluate agent's ability to recognize when a feature is properly refined"
     }
   ];
 
@@ -166,8 +176,8 @@ export async function runQuickEvaluation(input: string, cwd: string = "/test/pro
 
   const response = await agent.generate(input);
   
-  // Use TDD coaching metric for quick eval
-  const metric = new TDDCoachingMetric();
+  // Use TDD knowledge metric for quick eval
+  const metric = new TDDKnowledgeMetric();
   
   return await evaluate({
     agentName: "TDD Refinement Agent",
@@ -175,6 +185,6 @@ export async function runQuickEvaluation(input: string, cwd: string = "/test/pro
     metric,
     output: response.text,
     globalRunId: `quick-eval-${Date.now()}`,
-    instructions: "Quick evaluation of TDD coaching effectiveness"
+    instructions: "Quick evaluation of TDD knowledge application in PRD refinement"
   });
 }

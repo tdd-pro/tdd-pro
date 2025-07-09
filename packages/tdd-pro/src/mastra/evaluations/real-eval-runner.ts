@@ -125,30 +125,42 @@ For local development without API costs, use: bun run test:evals
   async evaluateResponse(scenario: typeof REAL_EVAL_SCENARIOS[0], response: string) {
     const scores: Record<string, number> = {};
 
-    // Import our evaluation metrics
-    const { TDDCoachingMetric, SandiMetzMetric, ConversationQualityMetric } = 
-      await import('./tdd-metrics.js');
-    const { FeatureScopeAppropriateness } = 
-      await import('./feature-scope-metric.js');
+    // Import our new LLM-based evaluation metrics
+    const { 
+      TDDKnowledgeMetric,
+      TestStrategyCoachingMetric,
+      ConversationManagementMetric,
+      PRDRefinementQualityMetric,
+      PersonaConsistencyMetric,
+      ConversationTerminationMetric
+    } = await import('./prd-refinement-metrics.js');
 
-    // Run all relevant metrics
-    const tddMetric = new TDDCoachingMetric();
-    const tddResult = await tddMetric.measure(scenario.input, response);
-    scores.tddCoaching = tddResult.score;
+    // Run all relevant metrics for PRD refinement evaluation
+    const tddKnowledgeMetric = new TDDKnowledgeMetric();
+    const tddResult = await tddKnowledgeMetric.measure(scenario.input, response);
+    scores.tddKnowledge = tddResult.score;
 
-    const conversationMetric = new ConversationQualityMetric();
-    const conversationResult = await conversationMetric.measure(scenario.input, response);
-    scores.conversationQuality = conversationResult.score;
+    const testStrategyMetric = new TestStrategyCoachingMetric();
+    const testStrategyResult = await testStrategyMetric.measure(scenario.input, response);
+    scores.testStrategy = testStrategyResult.score;
 
-    const scopeMetric = new FeatureScopeAppropriateness();
-    const scopeResult = await scopeMetric.measure(scenario.input, response);
-    scores.featureScope = scopeResult.score;
+    const conversationMgmtMetric = new ConversationManagementMetric();
+    const conversationResult = await conversationMgmtMetric.measure(scenario.input, response);
+    scores.conversationManagement = conversationResult.score;
 
-    // For code-related scenarios, also check Sandi Metz
-    if (scenario.input.includes('class ') || scenario.input.includes('function ')) {
-      const sandiMetric = new SandiMetzMetric();
-      const sandiResult = await sandiMetric.measure(scenario.input, response);
-      scores.sandiMetz = sandiResult.score;
+    const prdRefinementMetric = new PRDRefinementQualityMetric();
+    const prdResult = await prdRefinementMetric.measure(scenario.input, response);
+    scores.prdRefinement = prdResult.score;
+
+    const personaMetric = new PersonaConsistencyMetric();
+    const personaResult = await personaMetric.measure(scenario.input, response);
+    scores.personaConsistency = personaResult.score;
+
+    // For well-defined scenarios, also check conversation termination
+    if (scenario.input.includes('Test Strategy') || scenario.input.includes('Given') || scenario.input.includes('When')) {
+      const terminationMetric = new ConversationTerminationMetric();
+      const terminationResult = await terminationMetric.measure(scenario.input, response);
+      scores.conversationTermination = terminationResult.score;
     }
 
     // Calculate overall score
