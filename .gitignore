@@ -6,6 +6,8 @@
 Thumbs.db
 .mcp.json
 .claude
+.env
+.env.example
 
 # Build artifacts
 dist/
@@ -26,3 +28,7 @@ node_modules/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# Evaluations - track history, ignore temp results
+evals/results/
+!evals/history/

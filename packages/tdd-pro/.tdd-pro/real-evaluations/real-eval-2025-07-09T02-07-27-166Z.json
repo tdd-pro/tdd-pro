@@ -1,0 +1,63 @@
+[
+  {
+    "scenario": "Code Quality Violation",
+    "input": "\nclass UserService {\n  authenticateUser(email: string, password: string, rememberMe: boolean, ipAddress: string, userAgent: string, deviceFingerprint: string) {\n    // This method violates Sandi Metz rules - too many parameters\n    return this.validateCredentials(email, password);\n  }\n}",
+    "output": "You're right that this violates Sandi Metz's rules about method parameter count (she suggests no more than 4). But before we jump into refactoring, let me ask some critical TDD questions:\n\n1. What specific test cases are driving the need for all these parameters? Can you share a failing test that demonstrates why we need each of these authentication factors?\n\n2. It seems like we're mixing multiple concerns here:\n   - Basic authentication (email/password)\n   - Session management (rememberMe)\n   - Security context (ipAddress, userAgent, deviceFingerprint)\n\n3. From a SOLID perspective, this likely violates Single Responsibility Principle. Should we consider splitting this into separate objects?\n\nHere's a potential direction, but I'd like to hear your test cases first:\n\n```typescript\ninterface AuthenticationContext {\n  ipAddress: string;\n  userAgent: string;\n  deviceFingerprint: string;\n}\n\ninterface Credentials {\n  email: string;\n  password: string;\n}\n\nclass UserService {\n  authenticateUser(\n    credentials: Credentials, \n    options: { rememberMe: boolean }, \n    context: AuthenticationContext\n  ) {\n    // Implementation\n  }\n}\n```\n\nBefore we proceed with this refactoring:\n1. Can you share the test that's driving this authentication requirement?\n2. How are you currently mocking/stubbing these dependencies in tests?\n3. What specific behaviors change based on these parameters?\n\nThis will help us ensure we're refactoring with proper test coverage and clear responsibilities.",
+    "timestamp": "2025-07-09T02:07:12.636Z",
+    "evaluationScores": {
+      "tddCoaching": 100,
+      "conversationQuality": 80,
+      "featureScope": 25,
+      "sandiMetz": 96,
+      "overall": 75
+    }
+  },
+  {
+    "scenario": "Well-defined Feature",
+    "input": "Feature: User Login\nGiven a user with valid email and password\nWhen they submit the login form\nThen they receive a JWT token and are redirected to dashboard\n\nTest Strategy:\n- Unit tests for password validation\n- Integration tests for JWT generation",
+    "output": "I see some gaps in the TDD approach here that we should address before proceeding. Let's break this down:\n\n1. **Missing Test-First Specifics:**\n   - What's the first failing test we should write?\n   - We need more specific test cases that drive the implementation\n   - The current description is too high-level for TDD\n\n2. **Behavioral Boundaries Need Definition:**\n   - What constitutes a \"valid\" password? We need specific rules\n   - What happens when validation fails?\n   - What specific HTTP status codes should be returned?\n   - What's the exact format of the JWT payload?\n\n3. **Test Strategy Concerns:**\n   - The current strategy is too broad\n   - We need to start with smaller, focused unit tests\n   - Where are the edge cases?\n\nLet me propose a more TDD-focused approach. Could you provide specifics for:\n\n1. Password validation rules:\n   - Minimum length?\n   - Required character types?\n   - Maximum length?\n\n2. Error scenarios:\n   - Invalid email format\n   - User not found\n   - Incorrect password\n   - Account locked\n\n3. JWT requirements:\n   - Token expiration time\n   - Required claims\n   - Refresh token strategy?\n\nLet's start with a proper red-green-refactor cycle. Here's a suggested first test:\n\n```ruby\ndescribe UserAuthenticator do\n  it \"rejects invalid email format\" do\n    authenticator = UserAuthenticator.new\n    result = authenticator.authenticate(email: \"invalid-email\", password: \"password123\")\n    expect(result.success?).to be false\n    expect(result.error).to eq(:invalid_email_format)\n  end\nend\n```\n\nWould you like to start with this test, or should we define different initial behavior to test? Remember, we want to start small and grow the implementation through failing tests.\n\nAlso, regarding dependencies:\n- How will we inject the JWT token generator?\n- Will we need a separate password hashing service?\n- How will we mock the user repository in tests?\n\nLet's establish these boundaries before proceeding with the implementation. What specific aspect should we test first?",
+    "timestamp": "2025-07-09T02:06:56.272Z",
+    "evaluationScores": {
+      "tddCoaching": 100,
+      "conversationQuality": 65,
+      "featureScope": 25,
+      "overall": 63
+    }
+  },
+  {
+    "scenario": "Vague Feature Request",
+    "input": "I want to implement user authentication",
+    "output": "",
+    "timestamp": "2025-07-09T02:06:20.642Z",
+    "evaluationScores": {
+      "tddCoaching": 0,
+      "conversationQuality": 0,
+      "featureScope": 50,
+      "overall": 17
+    }
+  },
+  {
+    "scenario": "Over-scoped Feature",
+    "input": "Build a complete e-commerce platform with user management, payment processing, inventory, analytics dashboard, and admin panel",
+    "output": "",
+    "timestamp": "2025-07-09T02:06:36.626Z",
+    "evaluationScores": {
+      "tddCoaching": 0,
+      "conversationQuality": 0,
+      "featureScope": 50,
+      "overall": 17
+    }
+  },
+  {
+    "scenario": "Micro-feature (Over-granular)",
+    "input": "Add a login button to the header",
+    "output": "",
+    "timestamp": "2025-07-09T02:07:26.162Z",
+    "evaluationScores": {
+      "tddCoaching": 0,
+      "conversationQuality": 0,
+      "featureScope": 15,
+      "overall": 5
+    }
+  }
+]

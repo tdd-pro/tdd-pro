@@ -33,3 +33,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 # Finder (MacOS) folder config
 .DS_Store
 .mastra
+
+# Test databases and temp files
+*.db
+test-*.db
+
