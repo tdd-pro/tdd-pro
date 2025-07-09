@@ -1,0 +1,221 @@
+name: TDD Refinement Agent Evaluations
+
+on:
+  push:
+    branches: [ main, master ]  # Runs on master/main pushes
+  pull_request:
+    branches: [ main, master ]
+  schedule:
+    - cron: '0 6 * * *'  # Daily at 6 AM UTC
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  evaluate-agent:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: |
+        cd packages/tdd-pro
+        npm ci
+    
+    - name: Run Real Evaluations
+      env:
+        ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        EVAL_MODEL: claude-3-5-sonnet-20241022
+        EVAL_SAVE_RESULTS: true
+      run: |
+        cd packages/tdd-pro
+        npm run eval:ci
+    
+    - name: Store Results in Repository
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: |
+        cd packages/tdd-pro
+        
+        # Create evaluation history directory
+        mkdir -p ../../evals/history
+        
+        # Copy results with timestamp
+        TIMESTAMP=$(date +"%Y-%m-%d_%H-%M-%S")
+        COMMIT_SHA="${{ github.sha }}"
+        
+        if [ -d "../../evals/results" ]; then
+          cp -r ../../evals/results/* ../../evals/history/
+          
+          # Create a summary file for this run
+          cat > ../../evals/history/run-${TIMESTAMP}-${COMMIT_SHA:0:7}.md << EOF
+        # Evaluation Run ${TIMESTAMP}
+        
+        **Commit:** ${COMMIT_SHA}
+        **Branch:** ${{ github.ref_name }}
+        **Trigger:** ${{ github.event_name }}
+        **Workflow:** ${{ github.run_id }}
+        
+        $(find ../../evals/results -name "*-report.md" -exec cat {} \;)
+        EOF
+        fi
+    
+    - name: Download Previous Results for Comparison
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      uses: actions/checkout@v4
+      with:
+        ref: main
+        path: previous-results
+        sparse-checkout: |
+          evals/history/
+    
+    - name: Compare with Historical Results
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: |
+        cd packages/tdd-pro
+        
+        # Find the latest previous result
+        if [ -d "../previous-results/evals/history" ]; then
+          LATEST_PREVIOUS=$(ls -t ../previous-results/evals/history/run-*.md 2>/dev/null | head -1)
+          
+          if [ ! -z "$LATEST_PREVIOUS" ]; then
+            echo "📊 Comparing with previous run: $(basename $LATEST_PREVIOUS)"
+            
+            # Extract scores from current and previous runs
+            CURRENT_REPORT=$(find ../../evals/results -name "*-report.md" | head -1)
+            
+            if [ -f "$CURRENT_REPORT" ]; then
+              echo "=== PERFORMANCE COMPARISON ===" >> comparison-report.md
+              echo "Previous: $(basename $LATEST_PREVIOUS)" >> comparison-report.md
+              echo "Current: $(basename $CURRENT_REPORT)" >> comparison-report.md
+              echo "" >> comparison-report.md
+              
+              # Simple score extraction (you can enhance this)
+              PREV_SCORE=$(grep "Average Score:" "$LATEST_PREVIOUS" | grep -o '[0-9]\+' | head -1)
+              CURR_SCORE=$(grep "Average Score:" "$CURRENT_REPORT" | grep -o '[0-9]\+' | head -1)
+              
+              if [ ! -z "$PREV_SCORE" ] && [ ! -z "$CURR_SCORE" ]; then
+                SCORE_DIFF=$((CURR_SCORE - PREV_SCORE))
+                echo "📈 Score Change: $PREV_SCORE → $CURR_SCORE (${SCORE_DIFF:+\+}$SCORE_DIFF)" >> comparison-report.md
+                
+                if [ $SCORE_DIFF -lt -10 ]; then
+                  echo "⚠️ SIGNIFICANT REGRESSION DETECTED!" >> comparison-report.md
+                  echo "::warning::Agent performance dropped by $SCORE_DIFF points"
+                elif [ $SCORE_DIFF -gt 10 ]; then
+                  echo "🎉 SIGNIFICANT IMPROVEMENT!" >> comparison-report.md
+                  echo "::notice::Agent performance improved by $SCORE_DIFF points"
+                fi
+              fi
+            fi
+          else
+            echo "🆕 This is the first evaluation run - no comparison available"
+          fi
+        fi
+    
+    - name: Commit Results Back to Repository
+      if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+      run: |
+        cd packages/tdd-pro
+        
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        
+        # Add evaluation results to git
+        git add ../../evals/history/
+        
+        # Check if there are changes to commit
+        if ! git diff --staged --quiet; then
+          git commit -m "📊 Add evaluation results for commit ${{ github.sha }}
+        
+        - Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
+        - Workflow: ${{ github.run_id }}
+        - Trigger: ${{ github.event_name }}"
+          
+          git push
+        else
+          echo "No new evaluation results to commit"
+        fi
+    
+    - name: Upload Evaluation Artifacts
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: evaluation-results-${{ github.sha }}
+        path: |
+          evals/results/
+          packages/tdd-pro/comparison-report.md
+        retention-days: 90
+    
+    - name: Comment PR with Results
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+          const path = require('path');
+          
+          try {
+            // Find latest evaluation report
+            const evalDir = 'evals/results/';
+            if (fs.existsSync(evalDir)) {
+              const files = fs.readdirSync(evalDir);
+              const reportFile = files.find(f => f.endsWith('-report.md'));
+              
+              if (reportFile) {
+                const reportPath = path.join(evalDir, reportFile);
+                const report = fs.readFileSync(reportPath, 'utf8');
+                
+                // Also include comparison if available
+                let comparisonReport = '';
+                if (fs.existsSync('packages/tdd-pro/comparison-report.md')) {
+                  comparisonReport = fs.readFileSync('packages/tdd-pro/comparison-report.md', 'utf8');
+                }
+                
+                const fullReport = `## 🤖 Refinement Agent Evaluation Results
+        
+        ${report}
+        
+        ${comparisonReport ? `## 📊 Historical Comparison\n${comparisonReport}` : ''}
+        
+        **Evaluation Details:**
+        - Commit: ${{ github.sha }}
+        - Workflow: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+        - Results stored in: \`evals/history/\``;
+                
+                github.rest.issues.createComment({
+                  issue_number: context.issue.number,
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  body: fullReport
+                });
+              }
+            }
+          } catch (error) {
+            console.error('Failed to post evaluation results:', error);
+          }
+    
+    - name: Check Performance Threshold
+      run: |
+        cd packages/tdd-pro
+        
+        # Extract average score from report
+        REPORT_FILE=$(find ../../evals/results -name "*-report.md" | head -1)
+        if [ -f "$REPORT_FILE" ]; then
+          SCORE=$(grep "Average Score:" "$REPORT_FILE" | grep -o '[0-9]\+' | head -1)
+          
+          if [ ! -z "$SCORE" ]; then
+            echo "Current evaluation score: $SCORE/100"
+            
+            if [ $SCORE -lt 70 ]; then
+              echo "::error::Evaluation score ($SCORE) is below threshold (70)"
+              echo "🚨 Agent performance is below acceptable threshold!"
+              exit 1
+            else
+              echo "✅ Evaluation score meets threshold requirements"
+            fi
+          fi
+        fi
