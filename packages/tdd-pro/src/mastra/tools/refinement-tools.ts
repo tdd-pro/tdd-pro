@@ -1,12 +1,27 @@
 import { createTool } from "@mastra/core/tools";
 import { z } from "zod";
 import { RefinementAgent } from "../agents/refinement-agent";
-import { RefinementWorkflowManager, REFINEMENT_CRITERIA } from "../workflows/refinement-workflow";
 import path from "path";
 import os from "os";
 
-// Global workflow manager instance
-const workflowManager = new RefinementWorkflowManager();
+// Simplified refinement criteria (without complex workflow)
+const REFINEMENT_CRITERIA = {
+  TDD_READINESS: [
+    "Feature has clear, testable behaviors",
+    "Test strategy is defined and appropriate", 
+    "Dependencies are identified and mockable",
+    "Feature follows SOLID principles",
+    "Implementation boundaries are clear",
+    "Red-Green-Refactor cycle is applicable",
+  ],
+  CONVERSATION_RULES: [
+    "Agent acts as Senior TDD Architect",
+    "Agent challenges vague requirements",
+    "Agent provides Beck/Metz/Bernhardt wisdom",
+    "Agent ensures test-first thinking",
+    "Agent can terminate conversation when criteria met",
+  ]
+};
 
 // Active agent instances (simple in-memory storage for demo)
 const activeAgents = new Map<string, RefinementAgent>();
@@ -53,24 +68,33 @@ export const startRefinementConversation = createTool({
         };
       }
 
-      // Start the workflow - this will declare requirements upfront
-      const result = await workflowManager.startWorkflow(
-        context.featureId, 
-        context.userId || 'default-user'
-      );
-
-      // Store thread info for backward compatibility
-      activeThreads.set(context.featureId, {
+      // Get or create the agent
+      const agent = await getOrCreateAgent(context.cwd);
+      
+      // Use feature ID as thread ID for simpler conversation management
+      const threadId = context.featureId;
+      
+      // Store thread info
+      activeThreads.set(threadId, {
         agentKey: context.cwd,
         featureId: context.featureId,
         userId: context.userId || 'default-user'
       });
 
+      // Create initial message with requirements declaration
+      const initialMessage = context.message || `Let's refine the feature "${context.featureId}" to meet TDD standards.`;
+      
+      // Generate agent response
+      const response = await agent.generate(initialMessage, {
+        threadId,
+        resourceId: context.userId || "default-user",
+      });
+
       return {
         success: true,
-        threadId: context.featureId,
-        response: result.message,
-        phase: 'entry',
+        threadId,
+        response: response.text,
+        phase: 'conversation',
         requirements: REFINEMENT_CRITERIA,
       };
     } catch (error) {
@@ -115,17 +139,25 @@ export const continueRefinementConversation = createTool({
         };
       }
 
-      // Continue the workflow
-      const result = await workflowManager.continueWorkflow(
-        context.threadId,
-        context.message
-      );
+      // Get the agent
+      const agent = await getOrCreateAgent(context.cwd);
+      
+      // Generate response using agent
+      const response = await agent.generate(context.message, {
+        threadId: context.threadId,
+        resourceId: threadInfo.userId || "default-user",
+      });
+
+      // Check if conversation seems complete
+      const isComplete = response.text.toLowerCase().includes('tdd-ready') ||
+                        response.text.toLowerCase().includes('refinement complete') ||
+                        response.text.toLowerCase().includes('ready for implementation');
 
       return {
         success: true,
-        response: result.message,
-        phase: result.state?.phase,
-        isComplete: result.isComplete || false,
+        response: response.text,
+        phase: isComplete ? 'complete' : 'conversation',
+        isComplete,
       };
     } catch (error) {
       return {
@@ -203,31 +235,21 @@ export const getRefinementStatus = createTool({
         };
       }
 
-      const workflowStatus = await workflowManager.getWorkflowStatus(context.threadId);
-      
-      if (workflowStatus.status === 'not-found') {
+      const threadInfo = activeThreads.get(context.threadId);
+      if (!threadInfo) {
         return {
           success: true,
           status: "not-found",
         };
       }
 
-      const threadInfo = activeThreads.get(context.threadId);
-      const state = workflowStatus.state;
-      
-      let status: "active" | "complete" | "abandoned" = "active";
-      if (state?.phase === 'exit') {
-        status = "complete";
-      } else if (state?.phase === 'abandoned') {
-        status = "abandoned";
-      }
-
+      // For now, all active threads are considered "active"
       return {
         success: true,
-        status,
-        phase: state?.phase,
-        featureId: threadInfo?.featureId,
-        userId: threadInfo?.userId,
+        status: "active",
+        phase: "conversation",
+        featureId: threadInfo.featureId,
+        userId: threadInfo.userId,
       };
     } catch (error) {
       return {
@@ -261,14 +283,12 @@ export const abandonRefinementWorkflow = createTool({
         };
       }
 
-      const result = await workflowManager.abandonWorkflow(context.threadId);
-      
       // Clean up thread info
       activeThreads.delete(context.threadId);
 
       return {
         success: true,
-        response: result.message,
+        response: `Refinement workflow for ${context.threadId} has been abandoned.`,
       };
     } catch (error) {
       return {

@@ -27,7 +27,7 @@ export class RefinementAgent extends Agent {
       options: {
         lastMessages: 10,
         workingMemory: {
-          enabled: true,
+          enabled: false, // Disable working memory to avoid tool execution issues
         },
       },
     });
@@ -35,8 +35,9 @@ export class RefinementAgent extends Agent {
     // Initialize TDD validator
     const validator = new TDDValidator(config.cwd);
 
-    // Use real Anthropic model if API key provided, otherwise intelligent mock
-    const model = process.env.ANTHROPIC_API_KEY 
+    // Use real Anthropic model if API key provided, mock only for unit tests (not evaluations)
+    const isUnitTest = config.cwd === ':memory:' || (config.cwd.includes('/test') && !config.cwd.includes('evaluation'));
+    const model = (process.env.ANTHROPIC_API_KEY && !isUnitTest)
       ? anthropic(process.env.EVAL_MODEL || "claude-3-5-sonnet-20241022")
       : new MockLanguageModelV1({
       modelId: 'refinement-agent-model',
@@ -52,75 +53,65 @@ export class RefinementAgent extends Agent {
           return textContent;
         }).join(' ');
         
-        let response = "As a Senior TDD Architect, ";
+        let response = "";
 
-        // CODE ANALYSIS: Check if current prompt contains code
+        // 1. IDENTIFY ISSUES
         if (currentPrompt.includes('class ') || currentPrompt.includes('function ') || currentPrompt.includes('{')) {
           try {
             const violations = await validator.validateSandiMetzRules(currentPrompt, 'code.ts');
             if (violations.length > 0) {
-              response += "I see code that violates Sandi Metz principles. ";
               if (violations.some(v => v.includes('too many parameters'))) {
-                response += "This method has too many parameters. ";
+                response += "This violates SRP with too many parameters. ";
+              } else {
+                response += "I see design violations here. ";
               }
-              response += "Let's refactor this to follow TDD best practices. ";
             }
           } catch (e) {
-            // If validation fails, continue with general response
+            // If validation fails, continue
           }
+        }
+
+        // VAGUE BEHAVIOR DETECTION
+        if (currentPrompt.includes('correctly') || currentPrompt.includes('properly') || currentPrompt.includes('handle')) {
+          response += "That behavior description is too vague. What specific behavior should this demonstrate? ";
+        }
+
+        // 2. CHECK CONSTRAINTS (if design issues found)
+        if (response.includes('violates') || response.includes('violations')) {
+          response += "Is this constrained by an external API or framework? ";
+        }
+
+        // 3. DUAL PATH SOLUTION
+        if (response.includes('constrained')) {
+          response += "If changeable → Use parameter object + dependency injection. If external → Create clean wrapper interface. ";
         }
 
         // CONTEXT AWARENESS: Build on conversation history
         if (conversationHistory.includes('authentication') || conversationHistory.includes('JWT')) {
           response += "Building on our authentication discussion, ";
           if (currentPrompt.includes('JWT')) {
-            response += "I see you're working with JWT tokens. ";
+            response += "JWT tokens require careful testing strategy. ";
           }
         }
 
-        // VAGUE BEHAVIOR DETECTION
-        if (currentPrompt.includes('correctly') || currentPrompt.includes('properly') || currentPrompt.includes('handle')) {
-          response += "that behavior description is too vague. What specific behavior should this demonstrate? ";
-        }
-
-        // WELL-DEFINED FEATURE DETECTION & AUTO-PRD UPDATE
+        // WELL-DEFINED FEATURE DETECTION
         if (currentPrompt.includes('Given') && currentPrompt.includes('When') && currentPrompt.includes('Then')) {
-          response += "this is well-defined with clear Given-When-Then scenarios. ";
-          response += "Your feature appears ready for implementation. ";
-          
-          // Auto-update PRD when feature is well-defined
-          try {
-            // Extract feature ID from thread context (we'll get this from options somehow)
-            // For now, use a simple approach
-            response += "PRD updated with refined requirements. ";
-          } catch (e) {
-            // If PRD update fails, continue without it
-          }
+          response += "This is well-defined with clear Given-When-Then scenarios. Your feature appears ready for implementation. ";
         }
 
         // TDD CYCLE GUIDANCE
         if (currentPrompt.toLowerCase().includes('implement') || currentPrompt.toLowerCase().includes('how should i')) {
-          response += "Let's walk through the red-green-refactor cycle. Start with a failing test, then make it green, then refactor. ";
+          response += "Let's walk through red-green-refactor: Start with failing test, make it green, then refactor. ";
         }
 
         // DEPENDENCY INJECTION GUIDANCE
         if (currentPrompt.includes('payment') || currentPrompt.includes('email') || currentPrompt.includes('database')) {
-          response += "How will you handle dependencies for testing? Consider dependency injection and mocking strategies. What's the single responsibility of each component? ";
+          response += "How will you handle dependencies for testing? Consider dependency injection and mocking strategies. ";
         }
 
-        // ESCALATION: Check for multiple vague responses
-        const vagueTurns = allMessages.filter(msg => {
-          const text = (msg.content[0] as { text: string })?.text || '';
-          return text.length < 50 || text.includes('properly') || text.includes('work');
-        }).length;
-
-        if (vagueTurns >= 2) {
-          response += "I need specific details and test examples to help you effectively. ";
-        }
-
-        // DEFAULT TDD PROMPTING
+        // 4. TEST STRATEGY (always end with this)
         if (!response.includes('well-defined') && !response.includes('ready')) {
-          response += "What failing test drives this feature? Can you write a failing test that describes the expected behavior?";
+          response += "What failing test drives this feature?";
         }
         
         return {
@@ -135,43 +126,37 @@ export class RefinementAgent extends Agent {
     // Initialize as Mastra Agent with TDD-focused instructions
     super({
       name: 'TDD Refinement Agent',
-      instructions: `You are a Senior TDD Practitioner and Architect that embodies the wisdom of Joshua Kerievsky, Eric Evans, Martin Fowler, Kent Beck, Sandi Metz, DHH, and Gary Bernhardt. 
-      
-      Your role is to:
-      0. Encourage clear, short product briefs (who/what)
-      1. Challenge vague feature descriptions
-      2. Demand test-first thinking, firm grasp of key design and behaviors
-      3. Validate test strategies and design boundaries
-      4. Enforce SOLID principles and clean design
-      5. Guide through proper red-green-refactor cycles unless user rejects
-      6. Identify and address design anti-patterns and code smells
-      
-      DESIGN QUALITY EVALUATION:
-      - Identify smells and recommend refactoring opportunities
-      - Emphasize readability and recommend terse code-examples in TDD
-      - Detect tight coupling and suggest dependency injection
-      - Recognize primitive obsession and recommend value objects
-      - Spot anemic domain models and suggest rich domain objects
-      - Find mixed abstraction levels and recommend layered design
-      - Identify feature envy and suggest proper responsibility assignment
-      
-      Always ask probing questions about:
-      - What failing test drives this feature?
-      - How will dependencies be injected for testing?
-      - What's the single responsibility of each component?
-      - How will this be refactored after it passes?
-      - What design patterns would improve testability?
-      - Are there any design smells that need addressing?
-      - Is there a tree with file changes indicating new/update/delete?
-      - Does pseudo code demonstrate key interactions and behaviors?
-      - Where is code using 3rd party abstractions / libraries?
-      
-      When you see design issues, explicitly name them and suggest alternatives.
-      Be rigorous but helpful in guiding developers toward better TDD practices and clean design.
-      Remember that because some code may belong to newer frameworks, or legacy code, you sometimes
-      lack the full context of knowing the exact codebase and can only express opinions and recommendations
-      based on information available to you in the PRD. You may sometimes ask the agent to clarify
-      the context of code its using - e.g. is it part of a library / framework, is it new / existing?`,
+      instructions: `You are a Senior TDD Architect embodying Beck, Metz, Fowler, and Gary Bernhardt's wisdom.
+
+CORE MISSION: Transform vague features into testable, well-designed implementations.
+
+RESPONSE FRAMEWORK:
+Every response follows this 4-step structure:
+1. **Identify Issues**: Call out design problems with specific names (SRP violation, tight coupling, etc.)
+2. **Check Constraints**: "Is this an external API/framework requirement or changeable code?"
+3. **Dual Path Solution**:
+   - IF CHANGEABLE: Ideal TDD/SOLID approach
+   - IF CONSTRAINED: Pragmatic workaround (wrapper, abstraction layer, etc.)
+4. **Test Strategy**: Always ask "What failing test drives this?"
+
+CORE PRINCIPLES (Priority Order):
+1. Challenge vague requirements ("What specific behavior should this demonstrate?")
+2. Demand test-first thinking and red-green-refactor cycles
+3. Detect design smells: tight coupling, primitive obsession, feature envy, god objects
+4. Validate testability through dependency injection and clear boundaries
+
+EXAMPLE RESPONSES:
+"This violates SRP with 7 parameters. External API constraint? → Clean wrapper interface. Your code? → Parameter object + dependency injection. What failing test drives this feature?"
+
+"Tight coupling detected. Framework requirement? → Abstraction layer. Otherwise → Inject dependencies for testability. How will you mock these dependencies?"
+
+ALWAYS ASK:
+- What failing test drives this feature?
+- Is this design constrained by external systems?
+- How will dependencies be injected for testing?
+- What's the single responsibility here?
+
+Be rigorous but pragmatic. Always provide both ideal and constrained solutions.`,
       model,
       memory,
     });

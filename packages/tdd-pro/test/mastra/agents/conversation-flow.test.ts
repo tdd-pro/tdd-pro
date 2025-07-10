@@ -18,11 +18,14 @@ class UserManager {
   }
 }`;
 
-    const response = await agent.generate(codeWithViolations);
+    const response = await agent.generate(codeWithViolations, {
+      threadId: "test-validator",
+      resourceId: "test-user"
+    });
 
-    // Should detect and mention TDD violations in response
+    // Should detect and mention TDD violations in response using new structured framework
     expect(response.text).toContain("too many parameters");
-    expect(response.text).toContain("Sandi Metz");
+    expect(response.text).toContain("SRP");
   });
 
   test("FAILING: should maintain context across conversation turns", async () => {
@@ -64,7 +67,10 @@ class UserManager {
     });
 
     const vagueBehavior = "The system should handle user input correctly";
-    const response = await agent.generate(vagueBehavior);
+    const response = await agent.generate(vagueBehavior, {
+      threadId: "test-prompting",
+      resourceId: "test-user"
+    });
 
     // Should challenge vague descriptions with TDD questions
     expect(response.text).toContain("What failing test");
@@ -95,12 +101,13 @@ Test Strategy:
 - E2E tests for login flow
 `;
 
-    const response = await agent.generate(wellDefinedFeature);
+    const response = await agent.generate(wellDefinedFeature, {
+      threadId: "test-completion",
+      resourceId: "test-user"
+    });
 
     // Should recognize completeness and suggest refinement is done
-    expect(response.text).toContain("well-defined") || 
-    expect(response.text).toContain("ready") ||
-    expect(response.text).toContain("complete");
+    expect(response.text).toMatch(/well-defined|ready|complete/i);
   });
 
   test("FAILING: should escalate when developer provides insufficient detail", async () => {
@@ -143,12 +150,13 @@ I want to build a payment processor that:
 - Updates user account
 `;
 
-    const response = await agent.generate(featureWithDependencies);
+    const response = await agent.generate(featureWithDependencies, {
+      threadId: "test-dependencies",
+      resourceId: "test-user"
+    });
 
     // Should ask about dependency injection and testing strategies
-    expect(response.text).toContain("dependencies") || 
-    expect(response.text).toContain("inject") ||
-    expect(response.text).toContain("mock");
+    expect(response.text).toMatch(/dependencies|inject|mock/i);
     expect(response.text).toContain("single responsibility");
   });
 
@@ -162,7 +170,10 @@ I want to build a payment processor that:
     });
 
     const implementationQuestion = "How should I implement the password validation?";
-    const response = await agent.generate(implementationQuestion);
+    const response = await agent.generate(implementationQuestion, {
+      threadId: "test-tdd-cycle",
+      resourceId: "test-user"
+    });
 
     // Should guide through TDD cycle
     expect(response.text).toContain("failing test");

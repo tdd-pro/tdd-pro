@@ -148,9 +148,7 @@ Test Strategy:
 `, { threadId, resourceId: "user123" });
 
     // Should recognize completion and update PRD
-    expect(response.text).toContain("PRD updated") || 
-    expect(response.text).toContain("ready") ||
-    expect(response.text).toContain("complete");
+    expect(response.text).toMatch(/PRD updated|ready|complete/i);
   });
 
   test("FAILING: should validate PRD updates don't break existing structure", async () => {
@@ -168,8 +166,7 @@ Test Strategy:
     
     // Should validate and provide helpful feedback
     if (!result.success) {
-      expect(result.error).toContain("structure") || 
-      expect(result.error).toContain("format");
+      expect(result.error).toMatch(/structure|format/i);
     }
   });
 });
