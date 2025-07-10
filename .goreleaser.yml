@@ -5,7 +5,7 @@ project_name: tdd-pro
 before:
   hooks:
     # Build Node.js components first
-    - sh -c "cd packages/tdd-pro && npm ci && npm run build"
+    - sh -c "cd packages/tdd-pro && bun install --frozen-lockfile && bun run build"
 
 builds:
   - id: tui
