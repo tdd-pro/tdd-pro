@@ -3,11 +3,14 @@
   "version": "0.1.0",
   "main": "index.js",
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run --exclude '**/evaluations/**' --exclude '**/integration/**'",
+    "test:unit": "vitest run --exclude '**/evaluations/**' --exclude '**/integration/**'",
+    "test:integration": "vitest run test/integration/",
     "test:evals": "vitest run test/mastra/evaluations/",
+    "test:all": "vitest run",
     "eval:real": "tsx src/mastra/evaluations/real-eval-runner.ts",
     "eval:design": "tsx src/mastra/evaluations/design-eval-runner.ts",
-    "eval:ci": "npm run eval:real && echo 'Real evaluations completed for CI/CD'",
+    "eval:ci": "npm run test:integration && npm run eval:real",
     "eval:history": "node scripts/view-eval-history.js",
     "build": "./scripts/build-mcp.sh"
   },

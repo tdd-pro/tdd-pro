@@ -2,6 +2,26 @@ import { Metric, MetricResult } from "@mastra/core";
 import { anthropic } from "@ai-sdk/anthropic";
 import { generateText } from "ai";
 
+// Helper function for test environment scoring
+function getMockScore(output: string, criteria: Record<string, number>): MetricResult {
+  let score = 50; // Base score
+  const lowerOutput = output.toLowerCase();
+  
+  for (const [keyword, points] of Object.entries(criteria)) {
+    if (lowerOutput.includes(keyword)) {
+      score += points;
+    }
+  }
+  
+  return {
+    score: Math.min(score, 100),
+    info: {
+      reasoning: "Mock evaluation in test environment",
+      mode: "test-heuristic"
+    }
+  };
+}
+
 // TDD Knowledge Application Metric
 export class TDDKnowledgeMetric extends Metric {
   async measure(input: string, output: string): Promise<MetricResult> {

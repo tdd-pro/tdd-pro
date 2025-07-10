@@ -1,7 +1,14 @@
 import { test, expect, describe } from "vitest";
 import { evaluate, Metric, MetricResult } from "@mastra/core";
+import dotenv from "dotenv";
 
-describe("Refinement Agent Mastra Evaluations", () => {
+// Load environment variables
+dotenv.config();
+
+// Skip if no API key (for CI/CD without secrets)
+const describeIfApiKey = process.env.ANTHROPIC_API_KEY ? describe : describe.skip;
+
+describeIfApiKey("Refinement Agent Mastra Evaluations", () => {
   test("FAILING: should create TDD coaching effectiveness metric", async () => {
     // RED: This should fail because TDDCoachingMetric doesn't exist yet
     const { TDDCoachingMetric } = await import("../../../src/mastra/evaluations/tdd-metrics");
@@ -81,9 +88,9 @@ class UserManager {
     expect(results.length).toBeGreaterThan(0);
     
     // Should have multiple evaluation scenarios
-    expect(results.some(r => r.testInfo?.testName?.includes("TDD coaching"))).toBe(true);
-    expect(results.some(r => r.testInfo?.testName?.includes("Sandi Metz"))).toBe(true);
-    expect(results.some(r => r.testInfo?.testName?.includes("conversation quality"))).toBe(true);
+    expect(results.some(r => r.testInfo?.testName?.includes("TDD Knowledge"))).toBe(true);
+    expect(results.some(r => r.testInfo?.testName?.includes("Test Strategy"))).toBe(true);
+    expect(results.some(r => r.testInfo?.testName?.includes("Conversation"))).toBe(true);
   });
 
   test("FAILING: should evaluate Beck red-green-refactor guidance", async () => {

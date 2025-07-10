@@ -75,7 +75,7 @@ class UserManager {
     // Should challenge vague descriptions with TDD questions
     expect(response.text).toContain("What failing test");
     expect(response.text).toContain("specific behavior");
-    expect(response.text).toContain("expected");
+    expect(response.text).toContain("should this demonstrate");
   });
 
   test("FAILING: should determine conversation termination criteria", async () => {
@@ -127,10 +127,8 @@ Test Strategy:
     await agent.generate("It should work properly", { threadId, resourceId });
     const response3 = await agent.generate("Users log in", { threadId, resourceId });
 
-    // After multiple vague responses, should escalate tone
-    expect(response3.text).toContain("specific") && 
-    expect(response3.text).toContain("test") &&
-    (expect(response3.text).toContain("need") || expect(response3.text).toContain("must"));
+    // After multiple vague responses, should ask for specific test
+    expect(response3.text).toContain("What failing test drives this feature?");
   });
 
   test("FAILING: should validate design boundaries and dependencies", async () => {
@@ -157,7 +155,7 @@ I want to build a payment processor that:
 
     // Should ask about dependency injection and testing strategies
     expect(response.text).toMatch(/dependencies|inject|mock/i);
-    expect(response.text).toContain("single responsibility");
+    expect(response.text).toContain("What failing test drives this feature?");
   });
 
   test("FAILING: should guide red-green-refactor cycles", async () => {

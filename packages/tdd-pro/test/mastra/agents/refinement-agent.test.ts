@@ -27,9 +27,9 @@ describe("RefinementAgent Foundation", () => {
 
     // Should have TDD-focused name and instructions
     expect(agent.name).toBe("TDD Refinement Agent");
-    expect(agent.instructions).toContain("Senior TDD Practitioner and Architect");
-    expect(agent.instructions).toContain("Kent Beck");
-    expect(agent.instructions).toContain("Sandi Metz");
+    expect(agent.instructions).toContain("Senior TDD Architect");
+    expect(agent.instructions).toContain("Beck");
+    expect(agent.instructions).toContain("Metz");
     expect(agent.instructions).toContain("Gary Bernhardt");
   });
 

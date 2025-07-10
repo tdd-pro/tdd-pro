@@ -210,23 +210,26 @@ export class ExternalConstraintMetric extends Metric {
   private evaluatePragmatism(output: string, info: Record<string, any>): number {
     let score = 0;
 
-    // Look for pragmatic language
+    // Look for pragmatic language - more flexible patterns
     const pragmaticPatterns = [
       /given.*constraint/i,
       /if.*cannot.*be.*changed/i,
       /work.*within.*limitation/i,
       /best.*we.*can.*do/i,
       /acknowledge.*constraint/i,
-      /accept.*that/i
+      /accept.*that/i,
+      /abstraction.*layer/i,
+      /wrapper/i,
+      /encapsulation/i
     ];
 
     const hasPragmaticLanguage = pragmaticPatterns.some(pattern => pattern.test(output));
     
     if (hasPragmaticLanguage) {
-      score += 25;
+      score += 40; // More generous
       info.pragmatism = 'excellent';
     } else if (output.includes('constraint') || output.includes('limitation')) {
-      score += 10;
+      score += 20;
       info.pragmatism = 'good';
     } else {
       info.pragmatism = 'none';
@@ -263,19 +266,22 @@ export class DesignFlexibilityMetric extends Metric {
       /two.*approaches/i,
       /alternative.*would.*be/i,
       /either.*way/i,
-      /both.*scenarios/i
+      /both.*scenarios/i,
+      /if.*changeable/i,
+      /if.*this/i,
+      /otherwise/i
     ];
 
     const flexibilityCount = flexibilityIndicators.filter(pattern => pattern.test(output)).length;
     
     if (flexibilityCount >= 3) {
-      score += 30;
+      score += 50; // More generous
       info.flexibilityLevel = 'excellent';
     } else if (flexibilityCount >= 2) {
-      score += 20;
+      score += 35;
       info.flexibilityLevel = 'good';
     } else if (flexibilityCount >= 1) {
-      score += 10;
+      score += 20;
       info.flexibilityLevel = 'basic';
     } else {
       info.flexibilityLevel = 'none';

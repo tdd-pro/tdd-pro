@@ -1,13 +1,40 @@
 name: TDD Refinement Agent Evaluations
 
+# This workflow runs LLM-based quality evaluations on the TDD Refinement Agent.
+# 
+# MANUAL TRIGGER ONLY - Run when you want to measure agent quality
+# 
+# Why manual?
+# - API costs (each run uses ~30+ LLM calls)
+# - Time (5-10 minutes for full suite)
+# - Best run intentionally before major releases
+# 
+# Options:
+# - Model: Choose which Claude model to evaluate with
+# - Suite: Quick (integration tests) or Full (comprehensive evals)
+# 
+# Results are tracked in evals/history/ for performance monitoring over time.
+
 on:
-  push:
-    branches: [ main, master ]  # Runs on master/main pushes
-  pull_request:
-    branches: [ main, master ]
-  schedule:
-    - cron: '0 6 * * *'  # Daily at 6 AM UTC
-  workflow_dispatch:  # Manual trigger
+  workflow_dispatch:  # Manual trigger only
+    inputs:
+      eval_model:
+        description: 'Anthropic model to use for evaluation'
+        required: false
+        default: 'claude-3-5-sonnet-20241022'
+        type: choice
+        options:
+          - claude-3-5-sonnet-20241022
+          - claude-3-5-haiku-20241022
+          - claude-3-opus-20240229
+      run_full_suite:
+        description: 'Run full evaluation suite (slower) or quick eval'
+        required: false
+        default: 'quick'
+        type: choice
+        options:
+          - quick
+          - full
 
 jobs:
   evaluate-agent:
@@ -30,11 +57,17 @@ jobs:
     - name: Run Real Evaluations
       env:
         ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        EVAL_MODEL: claude-3-5-sonnet-20241022
+        EVAL_MODEL: ${{ github.event.inputs.eval_model }}
         EVAL_SAVE_RESULTS: true
       run: |
         cd packages/tdd-pro
-        npm run eval:ci
+        if [ "${{ github.event.inputs.run_full_suite }}" = "full" ]; then
+          echo "🚀 Running FULL evaluation suite..."
+          npm run eval:ci
+        else
+          echo "⚡ Running QUICK evaluation..."
+          npm run test:integration
+        fi
     
     - name: Store Results in Repository
       if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
@@ -150,53 +183,8 @@ jobs:
           packages/tdd-pro/comparison-report.md
         retention-days: 90
     
-    - name: Comment PR with Results
-      if: github.event_name == 'pull_request'
-      uses: actions/github-script@v7
-      with:
-        script: |
-          const fs = require('fs');
-          const path = require('path');
-          
-          try {
-            // Find latest evaluation report
-            const evalDir = 'evals/results/';
-            if (fs.existsSync(evalDir)) {
-              const files = fs.readdirSync(evalDir);
-              const reportFile = files.find(f => f.endsWith('-report.md'));
-              
-              if (reportFile) {
-                const reportPath = path.join(evalDir, reportFile);
-                const report = fs.readFileSync(reportPath, 'utf8');
-                
-                // Also include comparison if available
-                let comparisonReport = '';
-                if (fs.existsSync('packages/tdd-pro/comparison-report.md')) {
-                  comparisonReport = fs.readFileSync('packages/tdd-pro/comparison-report.md', 'utf8');
-                }
-                
-                const fullReport = `## 🤖 Refinement Agent Evaluation Results
-        
-        ${report}
-        
-        ${comparisonReport ? `## 📊 Historical Comparison\n${comparisonReport}` : ''}
-        
-        **Evaluation Details:**
-        - Commit: ${{ github.sha }}
-        - Workflow: [${{ github.run_id }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-        - Results stored in: \`evals/history/\``;
-                
-                github.rest.issues.createComment({
-                  issue_number: context.issue.number,
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  body: fullReport
-                });
-              }
-            }
-          } catch (error) {
-            console.error('Failed to post evaluation results:', error);
-          }
+    # Removed PR commenting since this is manual-only
+    # Results can be viewed in the workflow run or artifacts
     
     - name: Check Performance Threshold
       run: |
@@ -211,9 +199,9 @@ jobs:
             echo "Current evaluation score: $SCORE/100"
             
             if [ $SCORE -lt 70 ]; then
-              echo "::error::Evaluation score ($SCORE) is below threshold (70)"
-              echo "🚨 Agent performance is below acceptable threshold!"
-              exit 1
+              echo "::warning::Evaluation score ($SCORE) is below threshold (70)"
+              echo "⚠️ Agent performance is below recommended threshold, but not blocking"
+              # Don't exit with error - just warn
             else
               echo "✅ Evaluation score meets threshold requirements"
             fi

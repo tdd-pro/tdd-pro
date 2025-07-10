@@ -169,22 +169,39 @@ Test Strategy:
 
 // Helper function to run quick evaluation
 export async function runQuickEvaluation(input: string, cwd: string = "/test/project"): Promise<EvaluationResult> {
-  const agent = new RefinementAgent({
-    storageUrl: ":memory:",
-    cwd
-  });
+  try {
+    const agent = new RefinementAgent({
+      storageUrl: ":memory:",
+      cwd
+    });
 
-  const response = await agent.generate(input);
-  
-  // Use TDD knowledge metric for quick eval
-  const metric = new TDDKnowledgeMetric();
-  
-  return await evaluate({
-    agentName: "TDD Refinement Agent",
-    input,
-    metric,
-    output: response.text,
-    globalRunId: `quick-eval-${Date.now()}`,
-    instructions: "Quick evaluation of TDD knowledge application in PRD refinement"
-  });
+    const response = await agent.generate(input, {
+      threadId: `eval-${Date.now()}`,
+      resourceId: "eval-user"
+    });
+    
+    console.log("Agent response:", response.text.substring(0, 200) + "...");
+    
+    // Use TDD knowledge metric for quick eval
+    const metric = new TDDKnowledgeMetric();
+    
+    const result = await evaluate({
+      agentName: "TDD Refinement Agent",
+      input,
+      metric,
+      output: response.text,
+      globalRunId: `quick-eval-${Date.now()}`,
+      instructions: "Quick evaluation of TDD knowledge application in PRD refinement"
+    });
+    
+    console.log("Evaluation result:", result);
+    return result;
+  } catch (error) {
+    console.error("Quick evaluation error:", error);
+    return {
+      score: 0,
+      output: "Evaluation failed: " + String(error),
+      info: { error: String(error) }
+    };
+  }
 }

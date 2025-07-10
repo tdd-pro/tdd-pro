@@ -51,7 +51,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cd packages/tdd-pro && bun test
+          cd packages/tdd-pro && npm run test:unit
           cd ../tui && go test ./...
 
       - name: Build with GoReleaser (snapshot)

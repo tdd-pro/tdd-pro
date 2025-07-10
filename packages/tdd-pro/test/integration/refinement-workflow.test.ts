@@ -1,8 +1,15 @@
 import { test, expect, describe } from "vitest";
 import { runQuickEvaluation } from "../../src/mastra/evaluations/refinement-suite";
+import dotenv from "dotenv";
 
-describe("Refinement Agent Integration Workflow", () => {
-  test("should provide comprehensive TDD coaching for authentication feature", async () => {
+// Load environment variables for evaluation tests (local only)
+dotenv.config();
+
+// Skip these tests if no API key is available (e.g., in CI without secrets)
+const describeIfApiKey = process.env.ANTHROPIC_API_KEY ? describe : describe.skip;
+
+describeIfApiKey("Refinement Agent Integration Workflow", () => {
+  test("should provide comprehensive TDD coaching for authentication feature", { timeout: 20000 }, async () => {
     const input = "I want to implement user authentication with login and registration";
     
     const result = await runQuickEvaluation(input);
@@ -15,7 +22,7 @@ describe("Refinement Agent Integration Workflow", () => {
     console.log("📊 Coaching Effectiveness Score:", result.score);
   });
 
-  test("should challenge vague feature requirements", async () => {
+  test("should challenge vague feature requirements", { timeout: 20000 }, async () => {
     const input = "Make the authentication work properly and securely";
     
     const result = await runQuickEvaluation(input);
@@ -27,7 +34,7 @@ describe("Refinement Agent Integration Workflow", () => {
     console.log("🎯 Agent Probing Response:", result.output);
   });
 
-  test("should recognize well-defined features", async () => {
+  test("should recognize well-defined features", { timeout: 20000 }, async () => {
     const wellDefinedInput = `
 Feature: User Authentication
 Given a user with valid email and password
@@ -48,7 +55,7 @@ Test Strategy:
     console.log("✅ Agent Completion Recognition:", result.output);
   });
 
-  test("should detect code quality violations", async () => {
+  test("should detect code quality violations", { timeout: 20000 }, async () => {
     const codeInput = `
 class AuthManager {
   authenticateUser(email: string, password: string, rememberMe: boolean, ipAddress: string, userAgent: string, deviceId: string) {
@@ -65,7 +72,7 @@ class AuthManager {
     console.log("🔍 Agent Code Review:", result.output);
   });
 
-  test("should maintain conversation context and flow", async () => {
+  test("should maintain conversation context and flow", { timeout: 20000 }, async () => {
     // Test sequential conversation
     const firstInput = "I need user authentication";
     const firstResult = await runQuickEvaluation(firstInput);
